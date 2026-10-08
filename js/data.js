@@ -128,8 +128,8 @@ const ENEMIES = {
     immune: [], heavyBonus: 0,
     blurb: 'A scrappy goblin with a rusty knife and a dented bucket for a helmet.',
     moves: {
-      jab: { id: 'jab', name: 'Jab', icon: 'dagger', tint: 'steel', dmg: 10, hits: 1, desc: 'A quick jab with a rusty knife. 10 damage.' },
-      flurry: { id: 'flurry', name: 'Frenzied Flurry', icon: 'flurry', tint: 'blood', dmg: 4, hits: 4, desc: 'Four frantic stabs of 4 damage. Each hit is blocked separately.' },
+      jab: { id: 'jab', name: 'Jab', icon: 'dagger', tint: 'steel', dmg: 10, hits: 1, kind: 'light', desc: 'A quick jab with a rusty knife. 10 damage.' },
+      flurry: { id: 'flurry', name: 'Frenzied Flurry', icon: 'flurry', tint: 'blood', dmg: 4, hits: 4, kind: 'light', desc: 'Four frantic stabs of 4 damage. Each hit is blocked separately.' },
       buckler: { id: 'buckler', name: 'Hide Behind Buckler', icon: 'buckler', tint: 'wood', block: 12, desc: 'Cowers behind a scrap-wood buckler. Gains 12 block.' },
     },
     chooseMove(e, p) {
@@ -149,11 +149,11 @@ const ENEMIES = {
       { icon: 'hammer', tint: 'bronze', name: 'Brittle plate', desc: 'Takes +5 damage from Heavy Attacks.' },
     ],
     moves: {
-      cleave: { id: 'cleave', name: 'Rusted Cleave', icon: 'cleave', tint: 'steel', dmg: 18, hits: 1, desc: 'A heavy, rusty sweep. 18 damage.' },
-      chill: { id: 'chill', name: 'Grave Chill', icon: 'skull', tint: 'ice', dmg: 12, hits: 1, drain: 40, desc: 'A breath of the grave. 12 damage and drains 40 mana.' },
+      cleave: { id: 'cleave', name: 'Rusted Cleave', icon: 'cleave', tint: 'steel', dmg: 18, hits: 1, kind: 'heavy', desc: 'A heavy, rusty sweep. 18 damage.' },
+      chill: { id: 'chill', name: 'Grave Chill', icon: 'skull', tint: 'ice', dmg: 12, hits: 1, drain: 40, kind: 'frost', cast: true, desc: 'A breath of the grave. 12 damage and drains 40 mana.' },
       bulwark: { id: 'bulwark', name: 'Bone Bulwark', icon: 'tower', tint: 'steel', block: 25, desc: 'Braces behind old plate. Gains 25 block.' },
       overhead: { id: 'overhead', name: 'Crushing Overhead', icon: 'overhead', tint: 'blood', followup: 'overheadStrike', desc: 'Raises the greatsword high this turn, then brings it down next turn for 45 damage. A stun interrupts it.' },
-      overheadStrike: { id: 'overheadStrike', name: 'Crushing Overhead', icon: 'slam', tint: 'blood', dmg: 45, hits: 1, hidden: true, desc: 'The greatsword comes down. 45 damage.' },
+      overheadStrike: { id: 'overheadStrike', name: 'Crushing Overhead', icon: 'slam', tint: 'blood', dmg: 45, hits: 1, kind: 'heavy', hidden: true, desc: 'The greatsword comes down. 45 damage.' },
     },
     chooseMove(e, p) {
       const h = e.history, last = h[h.length - 1];

@@ -50,6 +50,16 @@ const COMMANDS = {
   unequip: { usage: 'unequip <slot>', desc: 'Remove gear from a slot.', run([slot]) { unequip(slot); log(`Cleared ${slot}.`, 'sys'); } },
   intent: { usage: 'intent <moveId>', desc: 'Force the enemy\'s next move.', run([id]) { if (!G.enemy.def.moves[id]) throw new Error(`Unknown move "${id}" (${Object.keys(G.enemy.def.moves).join(', ')})`); G.enemy.intent = id; log(`Enemy intent set to ${id}.`, 'sys'); render(); } },
   god: { usage: 'god', desc: 'Toggle an invulnerable player.', run() { G.god = !G.god; log(`God mode ${G.god ? 'on' : 'off'}.`, 'sys'); } },
+  sound: {
+    usage: 'sound [on|off|<0-100>|<name>]', desc: 'Toggle sound, set volume, or play a sound by name.',
+    run([arg]) {
+      if (arg === undefined) { log(`Sound ${Sfx.enabled ? 'on' : 'off'}, volume ${Math.round(Sfx.volume * 100)}. Sounds: ${Sfx.names.join(', ')}`, 'sys'); return; }
+      if (arg === 'on' || arg === 'off') { Sfx.setEnabled(arg === 'on'); UI.syncSound(); log(`Sound ${arg}.`, 'sys'); return; }
+      if (/^\d+$/.test(arg)) { Sfx.setVolume(num(arg) / 100); log(`Volume ${Math.round(Sfx.volume * 100)}.`, 'sys'); return; }
+      if (!Sfx.names.includes(arg)) throw new Error(`Unknown sound "${arg}"`);
+      Sfx.play(arg);
+    },
+  },
   clear: { usage: 'clear', desc: 'Clear the log.', run() { G.log = []; $('log').innerHTML = ''; } },
   state: { usage: 'state', desc: 'Dump the battle state as JSON.', run() { const { log: _l, ...rest } = G; const s = JSON.stringify(rest, (k, v) => (k === 'def' ? v.id : v), 1); s.split('\n').forEach((l) => log(l, 'sys mono')); } },
 };

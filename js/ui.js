@@ -219,7 +219,18 @@ function renderAll() {
   b.hidden = !G.over;
   if (G.over) { $('banner-title').textContent = G.over === 'won' ? 'Victory!' : 'Defeat'; $('banner-sub').textContent = G.over === 'won' ? `${e.def.name} lies broken at your feet.` : 'Your journey ends here... for now.'; }
   $('app').classList.toggle('enemy-turn', G.phase === 'enemy');
+  renderStageStates();
   refreshTipAfterRender();
+}
+
+function renderStageStates() {
+  const p = G.player, e = G.enemy;
+  const set = (id, c) => { const st = $(id).closest('.stage'); for (const [k, v] of Object.entries(c)) st.classList.toggle(k, !!v); };
+  set('p-sprite', { guarded: p.block > 0, charged: hasStatus(p, 'lightning'), dead: G.over === 'lost' });
+  set('e-sprite', {
+    guarded: e.block > 0, frozen: hasStatus(e, 'frozen'), burning: hasStatus(e, 'burn'), stunned: hasStatus(e, 'stunned'),
+    winding: e.intent === 'overheadStrike' && !G.over, dead: G.over === 'won',
+  });
 }
 
 /* ---- combat log ---------------------------------------------------------------------- */
@@ -232,20 +243,6 @@ function appendLog(text, cls) {
   box.scrollTop = box.scrollHeight;
 }
 function rebuildLog() { $('log').innerHTML = ''; G.log.forEach((l) => appendLog(l.text, l.cls)); }
-
-/* ---- floating numbers & hit flash ------------------------------------------------------ */
-
-function floatText(side, text, cls) {
-  const host = $(side === 'player' ? 'p-floats' : 'e-floats');
-  const f = el('span', 'float ' + cls, text);
-  f.style.left = 35 + Math.random() * 30 + '%';
-  host.appendChild(f);
-  setTimeout(() => f.remove(), 1300);
-}
-function flash(side) {
-  const s = $(side === 'player' ? 'p-sprite' : 'e-sprite');
-  s.classList.remove('hit'); void s.offsetWidth; s.classList.add('hit');
-}
 
 /* ---- equipment modal (display-only) ------------------------------------------------------ */
 
@@ -276,6 +273,7 @@ function openEquipment() {
 
 /* ---- wiring --------------------------------------------------------------------------- */
 
+const UI = {};
 function initUI() {
   initTooltips();
   Engine.listeners.push((ev) => {
@@ -283,15 +281,16 @@ function initUI() {
       case 'log': appendLog(ev.text, ev.cls); break;
       case 'new': rebuildLog(); renderAll(); break;
       case 'render': renderAll(); break;
-      case 'damage':
-        if (ev.dealt > 0) { floatText(ev.side, `-${ev.dealt}`, 'dmg'); flash(ev.side); }
-        if (ev.absorbed > 0) floatText(ev.side, `${ev.absorbed} blocked`, 'blocked');
-        break;
-      case 'heal': if (ev.amount) floatText(ev.side, `+${ev.amount}`, 'heal'); break;
-      case 'block': floatText(ev.side, `+${ev.amount} block`, 'blocked'); break;
+      default: Fx.handle(ev);
     }
   });
   $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) closeModal(); });
+  const sb = $('sound-btn');
+  const syncSound = () => { sb.textContent = Sfx.enabled ? '♪ Sound on' : '♪ Sound off'; sb.classList.toggle('off', !Sfx.enabled); };
+  sb.addEventListener('click', () => { Sfx.setEnabled(!Sfx.enabled); syncSound(); Sfx.play('click'); });
+  syncSound();
+  UI.syncSound = syncSound;
+  for (const evt of ['pointerdown', 'keydown']) document.addEventListener(evt, () => Sfx.unlock(), { once: true });
   $('banner-restart').addEventListener('click', () => newBattle(G.enemyId));
 
   const wrap = document.querySelector('.moves-wrap'), pop = $('moves-pop'), btn = $('moves-btn');

@@ -22,7 +22,7 @@
 
     <section class="panel" id="enemy-panel" aria-label="Opponent">
       <header class="nameplate"><h2 id="e-name"></h2><span class="lv" id="e-lv"></span></header>
-      <div class="stage"><div class="sprite" id="e-sprite"></div><div class="floats" id="e-floats"></div></div>
+      <div class="stage"><div class="sprite" id="e-sprite"></div><div class="stun-stars" aria-hidden="true"><span>✦</span><span>✧</span><span>✦</span></div><div class="floats" id="e-floats"></div></div>
       <div class="bars">
         <div class="row hp-row"><div class="block-badge" id="e-block"></div><div class="bar hp"><div class="fill" id="e-hp-fill"></div><span class="bar-label"><b>HP</b> <span id="e-hp-txt"></span></span></div></div>
       </div>
@@ -35,6 +35,7 @@
     </section>
 
     <section id="logbox" aria-label="Combat log">
+      <button class="btn small" id="sound-btn" type="button">♪ Sound on</button>
       <div id="log" aria-live="polite"></div>
       <form id="cli" autocomplete="off"><span class="prompt">&gt;</span><input id="cli-input" type="text" spellcheck="false" placeholder="type a command, e.g. help"></form>
     </section>
@@ -49,7 +50,9 @@
   <script src="js/engine.js"></script>
   <script src="js/icons.js"></script>
   <script src="js/sprites.js"></script>
+  <script src="js/audio.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/fx.js"></script>
   <script src="js/cli.js"></script>
   <script>newBattle('grubnik');</script>
 </body>

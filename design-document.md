@@ -26,6 +26,8 @@ menu_fight/
 │   ├── engine.js    # turn loop, damage pipeline, status handling, enemy AI
 │   ├── ui.js        # render(state), tooltips, modals, input wiring
 │   ├── cli.js       # combat-log command line + debug commands
+│   ├── audio.js     # procedural sound effects (Web Audio API, no audio files)
+│   ├── fx.js        # visual effects + mapping engine events to sounds
 │   ├── sprites.js   # inline SVG placeholder sprites
 │   └── icons.js     # inline SVG square icons for moves, items, equipment, statuses
 └── assets/          # reserved for real art later
@@ -85,6 +87,46 @@ Every move, item, equipment piece and status effect is represented by a **square
 - **Lighting:** warm, candle-like vignette over the whole screen.
 - All colours, spacing and textures are CSS custom properties (design tokens) in `:root` so the look is tweakable in one place.
 - Textures are generated in CSS or inline SVG; no external image dependency for v0.
+
+## 4.1 Animation, effects and sound
+
+**Timing.** Actions resolve as timed step sequences rather than instantly, so each beat is readable:
+- A melee attack lunges, then the hit lands about 170 ms later.
+- A spell is cast, a projectile flies across the panels, and it lands about 340 ms later.
+- Each hit of a multi-hit move (e.g. Frenzied Flurry) is its own step, about 330 ms apart.
+- Burn ticks, Lightning Shield and the enemy's turn are spaced out the same way.
+- Input is ignored while a sequence plays. Timings live in one table (`T` in `engine.js`).
+
+**Sprite motion** (Web Animations API, composited so motions stack):
+- Melee: the attacker slides forward and back. Heavy attacks slide further, with a lean.
+- Being hit: the target recoils away from the attacker and flashes white.
+- Casting: a small forward lean and a hop.
+- Raising a shield: a small step back.
+
+**Visual effects:**
+- Hit sparks coloured by damage type: steel/gold for physical, orange for fire, ice-blue for frost, violet for lightning.
+- Fireball, Frost Arrow and Grave Chill fly as projectiles between the panels.
+- Shield effects: a translucent shield appears in front of the defender when block is gained, flashes with a ring when a hit is absorbed, and splits in two when block is broken.
+- A faint blue aura shows while a character has block.
+- Persistent states: a violet flicker while Lightning Shield is on, an icy tint while Frozen, an ember glow while burning, orbiting stars while Stunned, a raised, red-glowing stance while the Warden winds up Crushing Overhead, and a greyed-out, slumped sprite on defeat.
+
+**Sound.** All sounds are synthesized in code (oscillators and filtered noise), so there are no asset files. Enemy and player moves of the same nature share sounds:
+
+| Sound | Used for |
+|---|---|
+| swing / heavySwing | light and heavy melee wind-ups (player and enemy) |
+| hit / heavyHit (+ hurt for the player) | unblocked physical hits |
+| defend | gaining block (Defend, Buckler, Bulwark) |
+| block | a hit absorbed by block |
+| shieldBreak | block reduced to 0 by a hit |
+| fireCast / fireImpact / burn | Fireball and Burn ticks |
+| frostCast / frostImpact | Frost Arrow, and the impact of Grave Chill |
+| chill / drain | Grave Chill cast and mana drain |
+| zap / lightningOn / lightningOff | Lightning Shield tick and toggles |
+| stagger / stun / immune / windup | status cues and the Warden's wind-up |
+| potion / turn / victory / defeat / click | items, start of your turn, fight end, UI |
+
+Sound can be toggled with the button on the combat log or with the `sound` CLI command, which also sets the volume and plays any sound by name. The setting is remembered in the browser.
 
 ## 5. Sprites
 
@@ -258,6 +300,7 @@ Initial command set (extensible; each command is a small entry in a table in `cl
 | `equip <slot> <item>` / `unequip <slot>` | Change equipment. |
 | `intent <moveId>` | Force the enemy's next move. |
 | `god` | Toggle invulnerable player. |
+| `sound [on\|off\|0-100\|name]` | Toggle sound, set volume, or play a sound. |
 | `clear` | Clear the log. |
 | `state` | Dump the current state as JSON. |
 
