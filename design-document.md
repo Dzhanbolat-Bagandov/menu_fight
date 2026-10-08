@@ -26,7 +26,8 @@ menu_fight/
 │   ├── engine.js    # turn loop, damage pipeline, status handling, enemy AI
 │   ├── ui.js        # render(state), tooltips, modals, input wiring
 │   ├── cli.js       # combat-log command line + debug commands
-│   └── sprites.js   # inline SVG placeholder sprites
+│   ├── sprites.js   # inline SVG placeholder sprites
+│   └── icons.js     # inline SVG square icons for moves, items, equipment, statuses
 └── assets/          # reserved for real art later
 ```
 
@@ -45,7 +46,8 @@ The window is split horizontally into two panels over a shared combat log.
 │ Status icons              │ [ Enemy moves ⓘ ]         │
 │ [Attack][Heavy][Defend]   │                           │
 │ [Fireball][Frost][Shield] │                           │
-│ [Inventory][End Turn]     │                           │
+│ [Potion][Tonic] (items)   │                           │
+│ [Equipment][End Turn]     │                           │
 ├───────────────────────────┴───────────────────────────┤
 │ Combat log                                            │
 │ > _  (command line)                                   │
@@ -53,10 +55,25 @@ The window is split horizontally into two panels over a shared combat log.
 ```
 
 - **Block** is shown as a shield icon placed in front of the health bar, with the block number on top of it. It is hidden at 0.
-- **Buttons** show cost, are disabled (with a reason in the tooltip) when the player cannot afford them or it is not their turn, and show a tooltip with the full description.
+- **Buttons** are disabled (with the reason in the tooltip) when the player cannot afford them or it is not their turn.
 - **Status effects** appear as small icons under the bars with stack count and remaining turns.
-- **Enemy moves button** opens a small window on hover or click listing every move the enemy can use and its description.
-- **Inventory button** opens a modal listing items; using an item is an action.
+- **Enemy moves button** opens a small window on hover or click listing every move the enemy can use and its description (using the same square icons and tooltips).
+- **Equipment button** opens the equipment menu (section 9).
+- **Usable items** (consumables) sit in the actions panel next to the base actions, as icons (section 9).
+
+### 3.1 Icons and tooltips
+
+Every move, item, equipment piece and status effect is represented by a **square icon**. This is one reusable UI component.
+
+- The icon is a square tile with an iron or bronze frame. It may carry small overlays: a cost badge, a stack count, a remaining-turns badge or a key hint.
+- **Hovering** an icon opens a context pop-up (tooltip) that contains:
+  - the same icon, enlarged;
+  - the name;
+  - the stats: cost, damage, block, duration, stacking rules and so on;
+  - the description text;
+  - for disabled actions, why they are disabled.
+- The pop-up stays inside the viewport and follows the pointer. On click or tap it can be pinned.
+- Icons are drawn as small inline SVGs (`icons.js`), so they can be replaced by real art later. Content comes from the data tables, so tooltips never need hand-written text per icon.
 
 ## 4. Visual style — cozy medieval
 
@@ -110,7 +127,7 @@ The player may take **multiple actions per turn** while they can afford them, th
 2. Attacker bonuses (e.g. the *Staggered* bonus on the target adds to light attacks).
 3. Attacker outgoing-damage reductions, multiplied together (e.g. enemy is *Staggered* ×0.85 and *Frozen* ×0.60 → ×0.51). Result is rounded to the nearest integer.
 4. **Block absorbs 1:1**: block is reduced first, the remainder hits HP.
-5. Damage-over-time effects (burn) and lightning shield **ignore block** and hit HP directly **(assumption)**.
+5. **Nothing ignores block.** Burn and Lightning Shield damage go through the same pipeline and are absorbed by block first.
 
 ## 7. Player actions
 
@@ -123,7 +140,8 @@ The player may take **multiple actions per turn** while they can afford them, th
 | **Frost Arrow** | 40 mana | Deal 30 damage. Apply **Frozen** for 1 turn. |
 | **Lightning Shield** | 10 mana per turn while active | **Toggle.** While active, at the end of each of your turns pay 10 mana and deal 10 damage to the enemy. If you cannot pay, it switches off. Toggling it on or off is free and does not use up a turn **(assumption: the 10 mana is a per-turn upkeep)**. |
 | **End Turn** | — | Ends the player turn. |
-| **Inventory** | — | Opens items; using an item is an action. |
+| **Equipment** | — | Opens the equipment menu (section 9). Free, not an action. |
+| **Items** | varies | Usable consumables are shown as icons in the actions panel next to the base actions (section 9). |
 
 Resting is **not** an in-combat action. It belongs to future out-of-combat events.
 
@@ -139,15 +157,38 @@ Resting is **not** an in-combat action. It belongs to future out-of-combat event
 
 Statuses are defined as data in `data.js` (name, icon, description, stacking rule, hooks) so new ones can be added without touching the engine.
 
-## 9. Inventory (placeholder items for v0, assumption)
+## 9. Items and equipment
 
-The three in-battle healing and recovery sources are skills, items and out-of-combat rest, so v0 ships a few simple consumables so the inventory button has something to show:
+### 9.1 Consumables
+
+Usable items are shown as **icons in the actions panel**, alongside the base actions, with a count badge. Using one is an action (it costs no resource, and may be used several times per turn). An item with a count of 0 is disabled. v0 ships a few placeholder consumables **(assumption)**:
 
 | Item | Effect | Count |
 |---|---|---|
 | Healing Draught | Restore 60 HP | 2 |
 | Mana Tonic | Restore 100 mana | 1 |
 | Stamina Tincture | Restore 50 stamina | 1 |
+
+### 9.2 Equipment menu
+
+A button in the actions panel opens the **equipment menu**: a modal laid out as a paper-doll with one square slot per piece. It shows wearable items only, not consumables.
+
+Slots: **head, chest, legs, gloves, main hand (weapon), off hand (weapon or shield), ring 1, ring 2**.
+
+- Each slot shows the equipped item's icon, or an empty frame. Hovering a slot shows the tooltip from section 3.1.
+- Below the doll, a summary lists the total stat bonuses from all equipped items.
+- v0 is **display-only** **(assumption)**: the menu shows what is equipped, but swapping items is not implemented. The data model already supports it (`equipment[slot] = itemId`), so adding an item list and equip/unequip later is an extension, not a rewrite. The CLI can change equipment for testing.
+
+**Demo loadout** (small, basic stats; other slots empty) **(assumption on the exact stats)**:
+
+| Slot | Item | Stats |
+|---|---|---|
+| Head | Plain Helm | none |
+| Main hand | Iron Sword | +1 damage on Attack and Heavy Attack |
+| Off hand | Wooden Shield | +1 block from Defend |
+| Chest, legs, gloves, ring 1, ring 2 | empty | — |
+
+Stats are flat modifiers defined as data on the item (e.g. `{ lightDamage: 1, heavyDamage: 1 }`). The engine sums all equipped items when it calculates damage and block, at step 2 of the damage pipeline, where they add to the *Staggered* bonus.
 
 ## 10. Enemies
 
@@ -213,7 +254,8 @@ Initial command set (extensible; each command is a small entry in a table in `cl
 | `enemy set <hp\|block> <n>` | Set an enemy value. |
 | `heal <n>` / `damage <n>` | Heal or damage the player. |
 | `status <add\|remove> <player\|enemy> <id> [n]` | Apply or remove a status. |
-| `give <item> [n]` | Add items to the inventory. |
+| `give <item> [n]` | Add consumables to the inventory. |
+| `equip <slot> <item>` / `unequip <slot>` | Change equipment. |
 | `intent <moveId>` | Force the enemy's next move. |
 | `god` | Toggle invulnerable player. |
 | `clear` | Clear the log. |
@@ -222,11 +264,11 @@ Initial command set (extensible; each command is a small entry in a table in `cl
 ## 12. Build plan
 
 1. **Static layout and theme:** panels, wood/stone/iron CSS, placeholder SVG sprites, bars, buttons. No logic.
-2. **State and render:** data model, `render(state)`, bars update from data.
+2. **State, render and icons:** data model, `render(state)`, bars update from data, reusable square icon and tooltip component.
 3. **Engine:** damage pipeline, block, statuses, turn loop, win/lose, restart.
 4. **Actions:** all six player actions, costs, disabled states, tooltips.
 5. **Enemies:** Grubnik and Warden with intent display, AI and moves window.
-6. **Inventory:** modal and the three placeholder items.
+6. **Items and equipment:** consumable icons in the actions panel, equipment menu with the demo loadout.
 7. **Combat log and CLI.**
 8. **Polish:** bar transitions, floating damage numbers, hit flashes, keyboard shortcuts.
 
@@ -238,8 +280,8 @@ Map, multiple fights, out-of-combat events, rewards, deck/relic-style progressio
 
 1. Several actions per turn plus an End Turn button (section 6.2).
 2. Lightning Shield costs 10 mana **per turn** as upkeep, rather than once (section 7).
-3. DoT and lightning shield ignore block (section 6.3).
-4. Heavy Attack only stuns when the target is *already* Staggered (section 7).
-5. A fourth Burn stack replaces the oldest one (section 8).
-6. Placeholder inventory contents (section 9).
+3. Heavy Attack only stuns when the target is *already* Staggered (section 7).
+4. A fourth Burn stack replaces the oldest one (section 8).
+5. Placeholder consumables (section 9.1) and the demo equipment stats: sword +1 attack damage, shield +1 block, helm none (section 9.2).
+6. The equipment menu is display-only in v0 (section 9.2).
 7. `index.html` opens straight from disk, using classic scripts rather than ES modules (section 2).
