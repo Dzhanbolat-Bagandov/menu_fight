@@ -45,6 +45,10 @@ const ICONS = {
   slam: `<g transform="rotate(180 24 24) scale(.8) translate(6 6)">${swordShape('#b9a089')}</g>${star(24, 40, 7, C.orange)}`,
 };
 ICONS.chest = ICONS.armor;
+ICONS.backpack = `<path d="M15 14c0-6 4-10 9-10s9 4 9 10" fill="none" stroke="${C.woodD}" stroke-width="3.5"/><rect x="9" y="13" width="30" height="32" rx="7" fill="${C.wood}" stroke="${C.dark}" stroke-width="1.6"/><path d="M9 22Q24 30 39 22V19Q24 26 9 19z" fill="${C.woodD}"/><rect x="14" y="29" width="20" height="12" rx="3" fill="#6b4423" stroke="${C.dark}"/><rect x="21" y="23" width="6" height="8" rx="1" fill="${C.bronze}" stroke="${C.dark}"/>`;
+ICONS.lore = `<path d="M3 12Q14 7 24 13V43Q14 37 3 42Z" fill="${C.parch}" stroke="${C.dark}" stroke-width="1.6" stroke-linejoin="round"/><path d="M45 12Q34 7 24 13V43Q34 37 45 42Z" fill="#e3d6b8" stroke="${C.dark}" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 19q7-3 12 0M8 25q7-3 12 0M8 31q7-3 12 0M28 19q7-3 12 0M28 25q7-3 12 0" stroke="#8a7a5c" stroke-width="1.6" fill="none"/><circle cx="34" cy="33" r="5" fill="${C.red}" stroke="${C.dark}"/>`;
+ICONS.swap = `<path d="M9 17H36l-7-7M39 31H12l7 7" stroke="${C.parch}" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+ICONS.bread = `<path d="M5 31C5 19 13 12 24 12s19 7 19 19v5c0 3-2 5-5 5H10c-3 0-5-2-5-5z" fill="#c98a4b" stroke="${C.dark}" stroke-width="1.6"/><path d="M5 31c0-9 8-15 19-15s19 6 19 15" fill="#e0a865"/><path d="M15 21l-3 7M24 19v8M33 21l3 7" stroke="#8a5428" stroke-width="2.4" stroke-linecap="round"/><circle cx="19" cy="34" r="2" fill="#5b2a6e"/><circle cx="29" cy="35" r="2" fill="#5b2a6e"/>`;
 
 function iconSVG(name, extraClass = '') {
   const body = ICONS[name] || ICONS.shield;

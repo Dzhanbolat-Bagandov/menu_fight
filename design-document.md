@@ -35,33 +35,34 @@ menu_fight/
 
 ## 3. Screen layout
 
-The window is split horizontally into two panels over a shared combat log.
+The window is split horizontally into two cards over a shared combat log. **Both cards use the same row layout with fixed row heights**, so every section lines up across the screen and the sprite areas are the same size:
 
 ```
-┌───────────────────────────┬───────────────────────────┐
-│ PLAYER                    │ OPPONENT                  │
-│ [ sprite ]                │ [ sprite ]                │
-│ Name · Lv                 │ Name · Lv                 │
-│ 🛡12 HP ████████░░ 180/250│ 🛡 HP ██████░░░░ 240/400  │
-│ Mana    █████░░░░░        │ Status icons              │
-│ Stamina ███████░░░        │ INTENT: icon + move + dmg │
-│ Status icons              │ [ Enemy moves ⓘ ]         │
-│ [Attack][Heavy][Defend]   │                           │
-│ [Fireball][Frost][Shield] │                           │
-│ [Potion][Tonic] (items)   │                           │
-│ [Equipment][End Turn]     │                           │
-├───────────────────────────┴───────────────────────────┤
-│ Combat log                                            │
-│ > _  (command line)                                   │
-└───────────────────────────────────────────────────────┘
+┌───────────────────────────────────┬───────────────────────────────────┐
+│ [🎒]      Sir Aldric · Lv 1        │ [📖]   Grubnik the Cutpurse · Lv 1 │  name row
+│            [ sprite ]             │            [ sprite ]             │  stage (fills the rest)
+│ 🛡 HP      ████████░░             │ 🛡 HP      ██████░░░░             │
+│    Mana    █████░░░░░             │                                   │  resources (enemy rows
+│    Stamina ███████░░░             │                                   │  are left empty)
+│ status icons                      │ status icons                      │  statuses
+│ [⇄] [1][2][3][4][5][6]  [End Turn]│ [icon] NEXT MOVE: Jab · 10 damage │  action bar / intent
+├───────────────────────────────────┴───────────────────────────────────┤
+│ Combat log                                             [♪ Sound on]   │
+│ > _  (command line)                                                   │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Block** is shown as a shield icon placed in front of the health bar, with the block number on top of it. It is hidden at 0.
+- **Corner buttons:** each card has a square icon button in its top-left corner.
+  - Player: **Equipment & Backpack** (hotkey I) opens the inventory (section 9).
+  - Enemy: **Enemy info** opens on hover (click to pin). It shows the creature's description, level, HP, all its moves and its traits.
+- **Action bar:** one row holding:
+  - a **toggle button** (left, hotkey Q) that swaps the bar between **Actions** and pinned **Items**. The current page fades out while the other slides in from the side;
+  - up to 6 tiles, which shrink to fit narrow windows. Number keys 1–6 use the tiles of the page that is showing;
+  - the **End Turn** button (hotkey E), anchored at the far right however many tiles are showing.
+- **Enemy intent** fills the same row on the enemy card.
+- **Block** is shown as a shield icon in front of the health bar, with the number on top of it. It is hidden at 0.
 - **Buttons** are disabled (with the reason in the tooltip) when the player cannot afford them or it is not their turn.
-- **Status effects** appear as small icons under the bars with stack count and remaining turns.
-- **Enemy moves button** opens a small window on hover or click listing every move the enemy can use and its description (using the same square icons and tooltips).
-- **Equipment button** opens the equipment menu (section 9).
-- **Usable items** (consumables) sit in the actions panel next to the base actions, as icons (section 9).
+- **Status effects** appear as small icons with stack count and remaining turns.
 
 ### 3.1 Icons and tooltips
 
@@ -203,34 +204,34 @@ Statuses are defined as data in `data.js` (name, icon, description, stacking rul
 
 ### 9.1 Consumables
 
-Usable items are shown as **icons in the actions panel**, alongside the base actions, with a count badge. Using one is an action (it costs no resource, and may be used several times per turn). An item with a count of 0 is disabled. v0 ships a few placeholder consumables **(assumption)**:
+Consumables live in the backpack. Any of them can be **pinned** to the action bar's Items page (up to 6) from the inventory screen. Using one is an action that costs no resource and may be repeated within a turn. A pinned item with a count of 0 stays on the bar, disabled.
 
-| Item | Effect | Count |
-|---|---|---|
-| Healing Draught | Restore 60 HP | 2 |
-| Mana Tonic | Restore 100 mana | 1 |
-| Stamina Tincture | Restore 50 stamina | 1 |
+| Item | Effect | Count | Pinned at start |
+|---|---|---|---|
+| Healing Draught | Restore 60 HP | 2 | yes |
+| Mana Tonic | Restore 100 mana | 1 | yes |
+| Stamina Tincture | Restore 50 stamina | 1 | yes |
+| Elderberry Bread | Restore 25 HP and 20 stamina | 3 | no |
 
-### 9.2 Equipment menu
+### 9.2 Equipment & Backpack screen
 
-A button in the actions panel opens the **equipment menu**: a modal laid out as a paper-doll with one square slot per piece. It shows wearable items only, not consumables.
+The corner button on the player card (hotkey I) opens a modal with two columns:
 
-Slots: **head, chest, legs, gloves, main hand (weapon), off hand (weapon or shield), ring 1, ring 2**.
+- **Equipped:** a paper-doll with one square slot per piece (head, chest, legs, gloves, main hand, off hand, two rings), plus the total stat bonuses. Clicking an equipped item moves it to the backpack.
+- **Backpack:** spare gear and consumables. Clicking gear equips it into its slot, and whatever was there goes back to the backpack. Rings fill the first free ring slot. Clicking a consumable pins or unpins it on the action bar (★ marks pinned items).
+- Gear can be changed on your turn but not while the enemy is acting.
 
-- Each slot shows the equipped item's icon, or an empty frame. Hovering a slot shows the tooltip from section 3.1.
-- Below the doll, a summary lists the total stat bonuses from all equipped items.
-- v0 is **display-only** **(assumption)**: the menu shows what is equipped, but swapping items is not implemented. The data model already supports it (`equipment[slot] = itemId`), so adding an item list and equip/unequip later is an extension, not a rewrite. The CLI can change equipment for testing.
+**Starting loadout**
 
-**Demo loadout** (small, basic stats; other slots empty) **(assumption on the exact stats)**:
-
-| Slot | Item | Stats |
+| Where | Item | Stats |
 |---|---|---|
 | Head | Plain Helm | none |
 | Main hand | Iron Sword | +1 damage on Attack and Heavy Attack |
 | Off hand | Wooden Shield | +1 block from Defend |
-| Chest, legs, gloves, ring 1, ring 2 | empty | — |
+| Backpack | Iron Gauntlets (gloves) | +2 damage on Attack |
+| Backpack | Bronze Ring (ring) | +2 spell damage (Fireball, Frost Arrow, Lightning Shield) |
 
-Stats are flat modifiers defined as data on the item (e.g. `{ lightDamage: 1, heavyDamage: 1 }`). The engine sums all equipped items when it calculates damage and block, at step 2 of the damage pipeline, where they add to the *Staggered* bonus.
+Stats are flat modifiers defined as data on the item (e.g. `{ lightDamage: 1, heavyDamage: 1 }`). The engine sums all equipped items when it calculates damage and block, at step 2 of the damage pipeline.
 
 ## 10. Enemies
 
@@ -296,8 +297,9 @@ Initial command set (extensible; each command is a small entry in a table in `cl
 | `enemy set <hp\|block> <n>` | Set an enemy value. |
 | `heal <n>` / `damage <n>` | Heal or damage the player. |
 | `status <add\|remove> <player\|enemy> <id> [n]` | Apply or remove a status. |
-| `give <item> [n]` | Add consumables to the inventory. |
-| `equip <slot> <item>` / `unequip <slot>` | Change equipment. |
+| `give <item> [n]` | Add consumables or gear to the backpack. |
+| `equip <item> [slot]` / `unequip <slot>` | Equip gear (conjured if not in the backpack) / move gear to the backpack. |
+| `pin <item>` | Pin or unpin a consumable on the action bar. |
 | `intent <moveId>` | Force the enemy's next move. |
 | `god` | Toggle invulnerable player. |
 | `sound [on\|off\|0-100\|name]` | Toggle sound, set volume, or play a sound. |
@@ -317,7 +319,7 @@ Initial command set (extensible; each command is a small entry in a table in `cl
 
 ## 13. Out of scope for v0
 
-Map, multiple fights, out-of-combat events, rewards, deck/relic-style progression, saving, sound, mobile layout.
+Map, multiple fights, out-of-combat events, rewards, deck/relic-style progression, saving, mobile layout.
 
 ## 14. Open questions / assumptions to confirm
 
@@ -326,5 +328,4 @@ Map, multiple fights, out-of-combat events, rewards, deck/relic-style progressio
 3. Heavy Attack only stuns when the target is *already* Staggered (section 7).
 4. A fourth Burn stack replaces the oldest one (section 8).
 5. Placeholder consumables (section 9.1) and the demo equipment stats: sword +1 attack damage, shield +1 block, helm none (section 9.2).
-6. The equipment menu is display-only in v0 (section 9.2).
-7. `index.html` opens straight from disk, using classic scripts rather than ES modules (section 2).
+6. `index.html` opens straight from disk, using classic scripts rather than ES modules (section 2).

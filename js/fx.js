@@ -194,6 +194,8 @@ const Fx = (() => {
         sparks(s, ev.res === 'hp' ? ['#8be07a', '#d8ffcc'] : ev.res === 'mana' ? ['#6fb0f2', '#bfe6ff'] : ['#e6c75a', '#fff1b0'], 8, { spread: 50 });
         break;
       case 'turn': play('turn'); break;
+      case 'equip': play('equip'); break;
+      case 'unequip': play('unequip'); break;
       case 'end': play(ev.result === 'won' ? 'victory' : 'defeat'); break;
     }
   }

@@ -59,8 +59,8 @@ const EQUIPMENT = {
   plain_helm: { name: 'Plain Helm', slot: 'head', icon: 'helm', tint: 'steel', bonus: {}, desc: 'A simple steel cap with an open visor.' },
   iron_sword: { name: 'Iron Sword', slot: 'mainHand', icon: 'sword', tint: 'steel', bonus: { lightDamage: 1, heavyDamage: 1 }, desc: 'Plain, well-balanced, a little nicked.' },
   wooden_shield: { name: 'Wooden Shield', slot: 'offHand', icon: 'shield', tint: 'wood', bonus: { defendBlock: 1 }, desc: 'Oak planks, iron-banded.' },
-  iron_gauntlets: { name: 'Iron Gauntlets', slot: 'gloves', icon: 'gloves', tint: 'steel', bonus: { lightDamage: 2 }, desc: 'Heavy gloves. For testing with the equip command.' },
-  bronze_ring: { name: 'Bronze Ring', slot: 'ring', icon: 'ring', tint: 'bronze', bonus: { spellDamage: 2 }, desc: 'A warm ring that hums faintly. For testing with the equip command.' },
+  iron_gauntlets: { name: 'Iron Gauntlets', slot: 'gloves', icon: 'gloves', tint: 'steel', bonus: { lightDamage: 2 }, desc: 'Riveted iron gloves that put weight behind every blow.' },
+  bronze_ring: { name: 'Bronze Ring', slot: 'ring', icon: 'ring', tint: 'bronze', bonus: { spellDamage: 2 }, desc: 'A warm ring that hums faintly when spells are near.' },
 };
 
 const DEFAULT_EQUIPMENT = { head: 'plain_helm', chest: null, legs: null, gloves: null, mainHand: 'iron_sword', offHand: 'wooden_shield', ring1: null, ring2: null };
@@ -73,7 +73,13 @@ const CONSUMABLES = {
   healing_draught: { name: 'Healing Draught', icon: 'flask_red', tint: 'blood', effect: { hp: 60 }, count: 2, desc: 'A bitter red tonic that knits wounds.' },
   mana_tonic: { name: 'Mana Tonic', icon: 'flask_blue', tint: 'mana', effect: { mana: 100 }, count: 1, desc: 'Tastes of cold spring water and copper.' },
   stamina_tincture: { name: 'Stamina Tincture', icon: 'flask_green', tint: 'stamina', effect: { stamina: 50 }, count: 1, desc: 'Sharp herbs that clear the head and warm the legs.' },
+  elderberry_bread: { name: 'Elderberry Bread', icon: 'bread', tint: 'wood', effect: { hp: 25, stamina: 20 }, count: 3, desc: 'Dense, sweet and still a little warm.' },
 };
+
+/* Starting backpack (unequipped gear) and which consumables are pinned to the action bar. */
+const DEFAULT_BACKPACK = ['iron_gauntlets', 'bronze_ring'];
+const DEFAULT_QUICKBAR = ['healing_draught', 'mana_tonic', 'stamina_tincture'];
+const QUICKBAR_MAX = 6;
 
 /* ---- Player actions ------------------------------------------------------ */
 
@@ -110,7 +116,6 @@ const ACTIONS = {
   },
 };
 const ACTION_ORDER = ['attack', 'heavy', 'defend', 'fireball', 'frost', 'lightning'];
-const ITEM_ORDER = ['healing_draught', 'mana_tonic', 'stamina_tincture'];
 
 /* ---- Enemies -------------------------------------------------------------- */
 

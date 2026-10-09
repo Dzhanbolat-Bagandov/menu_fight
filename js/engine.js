@@ -169,6 +169,8 @@ function newBattle(enemyId = 'grubnik') {
       name: p.name, level: p.level, hp: p.maxHp, maxHp: p.maxHp, mana: p.maxMana, maxMana: p.maxMana,
       stamina: p.maxStamina, maxStamina: p.maxStamina, block: 0, statuses: [],
       equipment: { ...DEFAULT_EQUIPMENT },
+      backpack: [...DEFAULT_BACKPACK],
+      quickbar: [...DEFAULT_QUICKBAR],
       items: Object.fromEntries(Object.entries(CONSUMABLES).map(([k, v]) => [k, v.count])),
     },
     enemy: { def, hp: def.maxHp, maxHp: def.maxHp, block: 0, statuses: [], intent: null, history: [], followup: null },
@@ -359,20 +361,56 @@ function useItem(id) {
   return { ok: true };
 }
 
-/* ---- equipment (used by CLI; UI menu is display-only) ----------------------- */
+/* ---- equipment & backpack ----------------------------------------------------- */
 
-function equip(slot, itemId) {
+function canChangeGear() {
+  if (G.phase === 'enemy' || G.busy) return { ok: false, reason: 'Wait for the enemy to finish its turn.' };
+  return { ok: true };
+}
+const slotLabel = (slot) => SLOTS.find((s) => s.id === slot).label;
+/* Slot an item goes into by default: its own slot, or the first free ring slot. */
+function targetSlot(itemId) {
   const it = EQUIPMENT[itemId];
-  if (!SLOTS.some((s) => s.id === slot)) throw new Error(`Unknown slot "${slot}"`);
+  if (it.slot !== 'ring') return it.slot;
+  return ['ring1', 'ring2'].find((s) => !G.player.equipment[s]) || 'ring1';
+}
+
+/* Equip an item from the backpack (or, for the CLI, conjure one). The replaced item goes to the backpack. */
+function equip(itemId, slot, { conjure = false } = {}) {
+  const p = G.player, it = EQUIPMENT[itemId];
   if (!it) throw new Error(`Unknown item "${itemId}"`);
-  if (!slotAccepts(it, slot)) throw new Error(`${it.name} does not fit in ${slot}`);
-  G.player.equipment[slot] = itemId;
+  slot = slot || targetSlot(itemId);
+  if (!SLOTS.some((s) => s.id === slot)) throw new Error(`Unknown slot "${slot}"`);
+  if (!slotAccepts(it, slot)) throw new Error(`${it.name} does not fit in ${slotLabel(slot)}`);
+  const idx = p.backpack.indexOf(itemId);
+  if (idx < 0 && !conjure) throw new Error(`${it.name} is not in your backpack`);
+  if (idx >= 0) p.backpack.splice(idx, 1);
+  const prev = p.equipment[slot];
+  if (prev) p.backpack.push(prev);
+  p.equipment[slot] = itemId;
+  log(`You equip ${it.name}${prev ? ` (replacing ${EQUIPMENT[prev].name})` : ''}.`, 'player');
+  emit({ type: 'equip', side: 'player', id: itemId });
   render();
 }
 function unequip(slot) {
   if (!SLOTS.some((s) => s.id === slot)) throw new Error(`Unknown slot "${slot}"`);
-  G.player.equipment[slot] = null;
+  const p = G.player, prev = p.equipment[slot];
+  if (!prev) return;
+  p.equipment[slot] = null;
+  p.backpack.push(prev);
+  log(`You stow ${EQUIPMENT[prev].name} in your backpack.`, 'player');
+  emit({ type: 'unequip', side: 'player', id: prev });
   render();
+}
+/* Pin or unpin a consumable on the action bar. */
+function toggleQuick(id) {
+  const q = G.player.quickbar;
+  if (!CONSUMABLES[id]) throw new Error(`Unknown item "${id}"`);
+  if (q.includes(id)) q.splice(q.indexOf(id), 1);
+  else if (q.length >= QUICKBAR_MAX) return { ok: false, reason: `The action bar holds at most ${QUICKBAR_MAX} items.` };
+  else q.push(id);
+  render();
+  return { ok: true };
 }
 
 /* ---- intent preview (what the enemy will do, with current debuffs) ---------- */

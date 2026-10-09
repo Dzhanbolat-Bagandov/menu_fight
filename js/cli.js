@@ -45,9 +45,18 @@ const COMMANDS = {
       render();
     },
   },
-  give: { usage: 'give <item> [n]', desc: `Add consumables (${Object.keys(CONSUMABLES).join(', ')}).`, run([id, n = 1]) { if (!CONSUMABLES[id]) throw new Error(`Unknown item "${id}"`); G.player.items[id] += num(n); log(`Gave ${n} x ${CONSUMABLES[id].name}.`, 'sys'); render(); } },
-  equip: { usage: 'equip <slot> <item>', desc: `Equip gear (slots: ${SLOTS.map((s) => s.id).join(', ')}; items: ${Object.keys(EQUIPMENT).join(', ')}).`, run([slot, id]) { equip(slot, id); log(`Equipped ${EQUIPMENT[id].name}.`, 'sys'); } },
-  unequip: { usage: 'unequip <slot>', desc: 'Remove gear from a slot.', run([slot]) { unequip(slot); log(`Cleared ${slot}.`, 'sys'); } },
+  give: {
+    usage: 'give <item> [n]', desc: `Add consumables or gear to the backpack (${[...Object.keys(CONSUMABLES), ...Object.keys(EQUIPMENT)].join(', ')}).`,
+    run([id, n = 1]) {
+      if (CONSUMABLES[id]) { G.player.items[id] = (G.player.items[id] || 0) + num(n); log(`Gave ${n} x ${CONSUMABLES[id].name}.`, 'sys'); }
+      else if (EQUIPMENT[id]) { for (let i = 0; i < num(n); i++) G.player.backpack.push(id); log(`Gave ${n} x ${EQUIPMENT[id].name}.`, 'sys'); }
+      else throw new Error(`Unknown item "${id}"`);
+      render();
+    },
+  },
+  equip: { usage: 'equip <item> [slot]', desc: `Equip gear, conjuring it if it is not in the backpack (slots: ${SLOTS.map((s) => s.id).join(', ')}).`, run([id, slot]) { equip(id, slot, { conjure: true }); } },
+  unequip: { usage: 'unequip <slot>', desc: 'Move gear from a slot to the backpack.', run([slot]) { unequip(slot); } },
+  pin: { usage: 'pin <item>', desc: 'Pin or unpin a consumable on the action bar.', run([id]) { const r = toggleQuick(id); if (!r.ok) throw new Error(r.reason); } },
   intent: { usage: 'intent <moveId>', desc: 'Force the enemy\'s next move.', run([id]) { if (!G.enemy.def.moves[id]) throw new Error(`Unknown move "${id}" (${Object.keys(G.enemy.def.moves).join(', ')})`); G.enemy.intent = id; log(`Enemy intent set to ${id}.`, 'sys'); render(); } },
   god: { usage: 'god', desc: 'Toggle an invulnerable player.', run() { G.god = !G.god; log(`God mode ${G.god ? 'on' : 'off'}.`, 'sys'); } },
   sound: {

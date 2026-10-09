@@ -139,6 +139,9 @@ const Sfx = (() => {
     turn() { tone({ f: 523, d: 0.25, g: 0.06 }); tone({ f: 784, t: 0.08, d: 0.3, g: 0.05 }); },
     victory() { [523, 659, 784, 1047].forEach((f, i) => tone({ type: 'triangle', f, t: i * 0.13, d: i === 3 ? 0.8 : 0.25, g: 0.18 })); },
     defeat() { [392, 349, 311, 262].forEach((f, i) => tone({ type: 'triangle', f, t: i * 0.22, d: i === 3 ? 1 : 0.3, g: 0.16 })); },
+    page() { noise({ a: 0.02, d: 0.12, g: 0.12, f: 1800, f2: 900, q: 1.5 }); tone({ f: 660, d: 0.06, g: 0.03 }); },
+    equip() { noise({ d: 0.08, g: 0.15, type: 'lowpass', f: 900 }); metal(980, { t: 0.05, d: 0.2, g: 0.06 }); },
+    unequip() { noise({ d: 0.1, g: 0.14, type: 'lowpass', f: 700 }); tone({ f: 240, f2: 180, d: 0.08, g: 0.15 }); },
     click() { tone({ f: 1400, d: 0.03, g: 0.04 }); },
   };
 

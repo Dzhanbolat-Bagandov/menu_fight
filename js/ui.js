@@ -9,12 +9,14 @@ const ucfirst = (s) => s[0].toUpperCase() + s.slice(1);
 
 /* opts: icon, tint, badge, badgeClass, count, key, disabled, tip (() => tooltip data), onclick, pressed, empty */
 function iconTile(o) {
-  const b = el(o.onclick ? 'button' : 'div', `tile tint-${o.tint || 'steel'}${o.disabled ? ' disabled' : ''}${o.pressed ? ' pressed' : ''}${o.empty ? ' empty' : ''}${o.size ? ' ' + o.size : ''}`);
+  const b = el(o.onclick ? 'button' : 'div', `tile tint-${o.tint || 'steel'}${o.disabled ? ' disabled' : ''}${o.pressed ? ' pressed' : ''}${o.empty ? ' empty' : ''}${o.size ? ' ' + o.size : ''}${o.cls ? ' ' + o.cls : ''}`);
   if (o.onclick) { b.type = 'button'; b.addEventListener('click', o.onclick); }
   b.innerHTML = iconSVG(o.icon);
   if (o.badge !== undefined && o.badge !== null) b.appendChild(el('span', `badge ${o.badgeClass || ''}`, o.badge));
   if (o.count !== undefined && o.count !== null) b.appendChild(el('span', 'count', o.count));
   if (o.key) b.appendChild(el('span', 'key', o.key));
+  if (o.mark) b.appendChild(el('span', 'mark', o.mark));
+  if (o.label) b.setAttribute('aria-label', o.label);
   if (o.tip) b._tip = o.tip;
   return b;
 }
@@ -26,7 +28,7 @@ const tooltip = { node: null, cur: null, x: 0, y: 0 };
 function tipHTML(t) {
   const lines = (t.lines || []).map((l) => `<li>${l}</li>`).join('');
   return `<div class="tip-head"><div class="tile big tint-${t.tint || 'steel'}">${iconSVG(t.icon)}</div><div><div class="tip-name">${t.name}</div>${t.tag ? `<div class="tip-tag">${t.tag}</div>` : ''}</div></div>` +
-    (lines ? `<ul class="tip-stats">${lines}</ul>` : '') + (t.desc ? `<p class="tip-desc">${t.desc}</p>` : '') + (t.warn ? `<p class="tip-warn">${t.warn}</p>` : '');
+    (lines ? `<ul class="tip-stats">${lines}</ul>` : '') + (t.desc ? `<p class="tip-desc">${t.desc}</p>` : '') + (t.hint ? `<p class="tip-hint">${t.hint}</p>` : '') + (t.warn ? `<p class="tip-warn">${t.warn}</p>` : '');
 }
 function positionTip() {
   const n = tooltip.node, pad = 14;
@@ -72,11 +74,16 @@ function actionTip(id) {
     return { icon: a.icon, tint: a.tint, name: a.name + (on ? ' (active)' : ''), tag: a.kind, lines: [costText(a), ...a.stats(bonuses())], desc: a.desc, warn: c.ok ? '' : c.reason };
   };
 }
-function itemTip(id) {
+function itemTip(id, inBackpack) {
   return () => {
     const it = CONSUMABLES[id], c = canUseItem(id);
     const fx = Object.entries(it.effect).map(([r, n]) => `Restores ${n} ${r}`);
-    return { icon: it.icon, tint: it.tint, name: it.name, tag: `Consumable · ${G.player.items[id]} left`, lines: fx, desc: it.desc, warn: c.ok ? '' : c.reason };
+    const pinned = G.player.quickbar.includes(id);
+    return {
+      icon: it.icon, tint: it.tint, name: it.name, tag: `Consumable · ${G.player.items[id] || 0} left`, lines: fx, desc: it.desc,
+      hint: inBackpack ? (pinned ? 'Pinned to the action bar. Click to unpin.' : 'Click to pin to the action bar.') : '',
+      warn: inBackpack ? '' : c.ok ? '' : c.reason,
+    };
   };
 }
 function statusTip(creature, id) {
@@ -92,12 +99,17 @@ function statusTip(creature, id) {
 function moveTip(move, interactive) {
   return () => ({ icon: move.icon, tint: move.tint, name: move.name, tag: interactive ? 'Enemy move' : 'Enemy intent', lines: [describeMove(move) ? ucfirst(describeMove(move)) : ''].filter(Boolean), desc: move.desc });
 }
-function equipTip(slot, id) {
+const SLOT_ICONS = { head: 'helm', chest: 'armor', legs: 'legs', gloves: 'gloves', mainHand: 'sword', offHand: 'shield', ring1: 'ring', ring2: 'ring' };
+const bonusLines = (it) => { const l = Object.entries(it.bonus).map(([k, v]) => `+${v} ${BONUS_LABELS[k]}`); return l.length ? l : ['No bonuses']; };
+/* slot: equipped slot id, or null for an item in the backpack */
+function equipTip(slotId, id) {
   return () => {
-    if (!id) return { icon: ({ head: 'helm', chest: 'armor', legs: 'legs', gloves: 'gloves', mainHand: 'sword', offHand: 'shield', ring1: 'ring', ring2: 'ring' })[slot.id], tint: 'steel', name: `${slot.label}: empty`, tag: 'Equipment slot', desc: 'Nothing equipped.' };
+    const gear = canChangeGear();
+    if (!id) { const slot = SLOTS.find((s) => s.id === slotId); return { icon: SLOT_ICONS[slotId], tint: 'steel', name: `${slot.label}: empty`, tag: 'Equipment slot', desc: 'Nothing equipped. Click gear in your backpack to equip it.' }; }
     const it = EQUIPMENT[id];
-    const lines = Object.entries(it.bonus).map(([k, v]) => `+${v} ${BONUS_LABELS[k]}`);
-    return { icon: it.icon, tint: it.tint, name: it.name, tag: `Equipment · ${slot.label}`, lines: lines.length ? lines : ['No bonuses'], desc: it.desc };
+    if (slotId) return { icon: it.icon, tint: it.tint, name: it.name, tag: `Equipped · ${slotLabel(slotId)}`, lines: bonusLines(it), desc: it.desc, hint: 'Click to move it to your backpack.', warn: gear.ok ? '' : gear.reason };
+    const target = targetSlot(id), prev = G.player.equipment[target];
+    return { icon: it.icon, tint: it.tint, name: it.name, tag: `Backpack · ${slotLabel(target)}`, lines: bonusLines(it), desc: it.desc, hint: `Click to equip${prev ? ` (replaces ${EQUIPMENT[prev].name})` : ''}.`, warn: gear.ok ? '' : gear.reason };
   };
 }
 const traitTip = (t) => () => ({ icon: t.icon, tint: t.tint, name: t.name, tag: 'Trait', desc: t.desc });
@@ -129,34 +141,60 @@ function renderStatuses(node, creature) {
   }
 }
 
-function renderActions() {
-  const box = $('actions');
-  box.innerHTML = '';
-  const group = (label, cls) => { const g = el('div', 'group'); g.appendChild(el('div', 'group-label', label)); const row = el('div', 'tiles ' + (cls || '')); g.appendChild(row); box.appendChild(g); return row; };
-  const row1 = group('Actions');
-  const hot = [];
-  ACTION_ORDER.forEach((id, i) => {
-    const a = ACTIONS[id], c = canUse(id), key = String(i + 1);
-    hot.push(id);
-    const costs = Object.entries(a.cost).map(([r, n]) => n + (r === 'mana' ? 'M' : 'S')).join(' ');
-    row1.appendChild(iconTile({
-      icon: a.icon, tint: a.tint, disabled: !c.ok, key,
-      pressed: id === 'lightning' && hasStatus(G.player, 'lightning'),
-      badge: costs, badgeClass: Object.keys(a.cost)[0],
-      tip: actionTip(id), onclick: () => { useAction(id); },
-    }));
-  });
-  const row2 = group('Items');
-  ITEM_ORDER.forEach((id, i) => {
+/* The action bar shows one page at a time: 'actions' or 'items' (pinned consumables). */
+const UI_STATE = { bar: 'actions' };
+function barEntries() {
+  if (UI_STATE.bar === 'actions') {
+    return ACTION_ORDER.map((id) => {
+      const a = ACTIONS[id], c = canUse(id);
+      const costs = Object.entries(a.cost).map(([r, n]) => n + (r === 'mana' ? 'M' : 'S')).join(' ');
+      return { icon: a.icon, tint: a.tint, disabled: !c.ok, pressed: id === 'lightning' && hasStatus(G.player, 'lightning'), badge: costs, badgeClass: Object.keys(a.cost)[0], tip: actionTip(id), run: () => useAction(id) };
+    });
+  }
+  return G.player.quickbar.map((id) => {
     const it = CONSUMABLES[id], c = canUseItem(id);
-    row2.appendChild(iconTile({ icon: it.icon, tint: it.tint, disabled: !c.ok, key: String(7 + i), count: G.player.items[id], tip: itemTip(id), onclick: () => { useItem(id); } }));
+    return { icon: it.icon, tint: it.tint, disabled: !c.ok, count: G.player.items[id] || 0, tip: itemTip(id, false), run: () => useItem(id) };
   });
-  const foot = el('div', 'foot-btns');
-  const eq = el('button', 'btn', `${iconSVG('armor', 'mini')} Equipment`); eq.type = 'button'; eq.addEventListener('click', openEquipment);
-  const et = el('button', 'btn primary', `${iconSVG('hourglass', 'mini')} End Turn <kbd>E</kbd>`); et.type = 'button';
-  et.disabled = G.phase !== 'player'; et.addEventListener('click', () => endTurn());
-  foot.append(eq, et);
-  box.appendChild(foot);
+}
+function fillPage(page) {
+  page.innerHTML = '';
+  const entries = barEntries();
+  entries.forEach((e, i) => page.appendChild(iconTile({ ...e, key: i < 9 ? String(i + 1) : '', onclick: e.run })));
+  if (!entries.length) page.appendChild(el('div', 'bar-empty', 'No items pinned. Open the backpack to pin consumables here.'));
+}
+function renderToggle() {
+  const t = $('bar-toggle');
+  const toItems = UI_STATE.bar === 'actions';
+  t.innerHTML = '';
+  t.appendChild(iconTile({
+    icon: toItems ? 'flask_red' : 'sword', tint: 'bronze', cls: 'toggle-tile', key: 'Q', mark: iconSVG('swap'),
+    label: toItems ? 'Show items' : 'Show actions', onclick: switchBar,
+    tip: () => ({ icon: 'swap', tint: 'bronze', name: toItems ? 'Show items' : 'Show actions', tag: 'Action bar', desc: toItems ? 'Swap the bar to your pinned consumables.' : 'Swap the bar back to your actions.', hint: 'Hotkey: Q' }),
+  }));
+}
+function renderActions() {
+  renderToggle();
+  fillPage($('bar-viewport').querySelector('.bar-page.current'));
+  const et = $('end-turn');
+  et.innerHTML = `${iconSVG('hourglass', 'mini')}<span>End Turn</span><kbd>E</kbd>`;
+  et.disabled = G.phase !== 'player' || !!G.over;
+}
+function switchBar() {
+  UI_STATE.bar = UI_STATE.bar === 'actions' ? 'items' : 'actions';
+  const vp = $('bar-viewport'), old = vp.querySelector('.bar-page.current');
+  const page = el('div', 'bar-page current');
+  fillPage(page);
+  vp.appendChild(page);
+  if (old) {
+    old.classList.remove('current');
+    const out = old.animate ? old.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.94)' }], { duration: 200, easing: 'ease-in', fill: 'forwards' }) : null;
+    if (out) out.onfinish = () => old.remove(); else old.remove();
+  }
+  const dir = UI_STATE.bar === 'items' ? 1 : -1;
+  if (page.animate) page.animate([{ opacity: 0, transform: `translateX(${dir * 70}px)` }, { opacity: 1, transform: 'none' }], { duration: 300, delay: 60, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'backwards' });
+  Sfx.play('page');
+  renderToggle();
+  refreshTipAfterRender();
 }
 
 function renderIntent() {
@@ -167,38 +205,47 @@ function renderIntent() {
   const stunned = hasStatus(e, 'stunned');
   const mult = outMult(e);
   const reduced = mult < 1 && (move.dmg);
-  box.appendChild(el('div', 'intent-label', 'Next move'));
   const line = el('div', 'intent-line');
-  line.appendChild(iconTile({ icon: move.icon, tint: move.tint, size: 'lg', tip: moveTip(move, false) }));
+  line.appendChild(iconTile({ icon: move.icon, tint: move.tint, tip: moveTip(move, false) }));
   const txt = el('div', 'intent-text');
   const name = el('div', 'intent-name', move.name + (e.intent === 'overheadStrike' ? ' <small>(strike)</small>' : move.followup ? ' <small>(wind-up)</small>' : ''));
   const sum = describeMove(move, mult);
   const detail = el('div', 'intent-detail', (stunned ? '<s>' : '') + ucfirst(sum || '...') + (stunned ? '</s> <b class="stunned-note">stunned!</b>' : ''));
-  txt.append(name, detail);
+  txt.append(el('div', 'intent-label', 'Next move'), name, detail);
   if (reduced && !stunned) txt.appendChild(el('div', 'intent-note', `Weakened by ${pct(mult)}%`));
   line.appendChild(txt);
   box.appendChild(line);
 }
 
-function renderMovesPopup() {
-  const pop = $('moves-pop');
-  pop.innerHTML = '<div class="pop-title">Known moves</div>';
-  const e = G.enemy.def;
-  for (const m of Object.values(e.moves)) {
-    if (m.hidden) continue;
-    const row = el('div', 'move-row');
-    row.appendChild(iconTile({ icon: m.icon, tint: m.tint, size: 'sm', tip: moveTip(m, true) }));
-    row.appendChild(el('div', 'move-text', `<b>${m.name}</b><span>${m.desc}</span>`));
-    pop.appendChild(row);
-  }
-  if (e.traits) {
-    pop.appendChild(el('div', 'pop-title', 'Traits'));
-    for (const t of e.traits) {
+function renderInfoPopup() {
+  const pop = $('info-pop'), e = G.enemy.def;
+  pop.innerHTML = '';
+  pop.appendChild(el('div', 'pop-head', `<b>${e.name}</b><span>Level ${e.level} · ${e.maxHp} HP</span>`));
+  pop.appendChild(el('p', 'blurb', e.blurb));
+  const section = (title, list) => {
+    pop.appendChild(el('div', 'pop-title', title));
+    for (const x of list) {
       const row = el('div', 'move-row');
-      row.appendChild(iconTile({ icon: t.icon, tint: t.tint, size: 'sm', tip: traitTip(t) }));
-      row.appendChild(el('div', 'move-text', `<b>${t.name}</b><span>${t.desc}</span>`));
+      row.appendChild(iconTile({ icon: x.icon, tint: x.tint, size: 'sm', tip: x.tip }));
+      row.appendChild(el('div', 'move-text', `<b>${x.name}</b><span>${x.desc}</span>`));
       pop.appendChild(row);
     }
+  };
+  section('Moves', Object.values(e.moves).filter((m) => !m.hidden).map((m) => ({ ...m, tip: moveTip(m, true) })));
+  if (e.traits) section('Traits', e.traits.map((t) => ({ ...t, tip: traitTip(t) })));
+}
+
+function renderCorners() {
+  const pc = $('p-corner');
+  if (!pc.firstChild) {
+    pc.appendChild(iconTile({
+      icon: 'backpack', tint: 'wood', size: 'sm', cls: 'corner-btn', label: 'Equipment and backpack', onclick: openInventory,
+      tip: () => ({ icon: 'backpack', tint: 'wood', name: 'Equipment & Backpack', tag: 'Inventory', desc: 'Equip gear and pin consumables to the action bar.', hint: 'Hotkey: I' }),
+    }));
+  }
+  const ec = $('e-corner');
+  if (!ec.querySelector('.corner-btn')) {
+    ec.insertBefore(iconTile({ icon: 'lore', tint: 'bronze', size: 'sm', cls: 'corner-btn', label: 'Enemy info', onclick: () => UI.toggleInfo() }), ec.firstChild);
   }
 }
 
@@ -206,9 +253,9 @@ function renderAll() {
   const p = G.player, e = G.enemy;
   $('p-name').textContent = p.name; $('p-lv').textContent = `Lv ${p.level}`;
   $('e-name').textContent = e.def.name; $('e-lv').textContent = `Lv ${e.def.level}`;
-  $('e-blurb').textContent = e.def.blurb;
+  renderCorners();
   if ($('p-sprite').dataset.s !== 'knight') { $('p-sprite').innerHTML = SPRITES.knight; $('p-sprite').dataset.s = 'knight'; }
-  if ($('e-sprite').dataset.s !== e.def.sprite) { $('e-sprite').innerHTML = spriteFor(e.def.sprite); $('e-sprite').dataset.s = e.def.sprite; renderMovesPopup(); }
+  if ($('e-sprite').dataset.s !== e.def.sprite) { $('e-sprite').innerHTML = spriteFor(e.def.sprite); $('e-sprite').dataset.s = e.def.sprite; renderInfoPopup(); }
   setBar('p-hp', p.hp, p.maxHp); setBar('p-mana', p.mana, p.maxMana); setBar('p-stam', p.stamina, p.maxStamina); setBar('e-hp', e.hp, e.maxHp);
   $('p-hp-txt').textContent = `${p.hp} / ${p.maxHp}`; $('p-mana-txt').textContent = `${p.mana} / ${p.maxMana}`; $('p-stam-txt').textContent = `${p.stamina} / ${p.maxStamina}`;
   $('e-hp-txt').textContent = `${e.hp} / ${e.maxHp}`;
@@ -244,30 +291,67 @@ function appendLog(text, cls) {
 }
 function rebuildLog() { $('log').innerHTML = ''; G.log.forEach((l) => appendLog(l.text, l.cls)); }
 
-/* ---- equipment modal (display-only) ------------------------------------------------------ */
+/* ---- inventory modal: equipment + backpack ------------------------------------------- */
 
-function closeModal() { $('modal').hidden = true; hideTip(); }
-function openEquipment() {
-  const card = $('modal-card');
-  card.innerHTML = '<h3>Equipment</h3>';
+function closeModal() { $('modal').hidden = true; UI.inventoryOpen = false; hideTip(); }
+function tryGear(fn) {
+  const c = canChangeGear();
+  if (!c.ok) { Fx.floatText('player', c.reason, 'blocked'); return; }
+  try { fn(); } catch (err) { log(err.message, 'err'); }
+  renderInventory();
+}
+function renderInventory() {
+  const card = $('modal-card'), p = G.player;
+  card.innerHTML = '<h3>Equipment &amp; Backpack</h3>';
+  const cols = el('div', 'inv-cols');
+
+  const left = el('div', 'inv-col');
+  left.appendChild(el('h4', '', 'Equipped'));
   const grid = el('div', 'doll');
-  const layout = [[null, 'head', null], ['mainHand', 'chest', 'offHand'], ['gloves', 'legs', null], ['ring1', null, 'ring2']];
+  const layout = [['ring1', 'head', 'ring2'], ['mainHand', 'chest', 'offHand'], ['gloves', 'legs', null]];
   for (const row of layout) for (const sid of row) {
     const cell = el('div', 'doll-cell');
     if (sid) {
-      const slot = SLOTS.find((s) => s.id === sid), id = G.player.equipment[sid];
-      const iconName = id ? EQUIPMENT[id].icon : ({ head: 'helm', chest: 'armor', legs: 'legs', gloves: 'gloves', mainHand: 'sword', offHand: 'shield', ring1: 'ring', ring2: 'ring' })[sid];
-      cell.appendChild(iconTile({ icon: iconName, tint: id ? EQUIPMENT[id].tint : 'steel', empty: !id, size: 'lg', tip: equipTip(slot, id) }));
-      cell.appendChild(el('div', 'slot-label', slot.label));
+      const id = p.equipment[sid];
+      cell.appendChild(iconTile({ icon: id ? EQUIPMENT[id].icon : SLOT_ICONS[sid], tint: id ? EQUIPMENT[id].tint : 'steel', empty: !id, tip: equipTip(sid, id), onclick: id ? () => tryGear(() => unequip(sid)) : undefined }));
+      cell.appendChild(el('div', 'slot-label', SLOTS.find((s) => s.id === sid).label));
     }
     grid.appendChild(cell);
   }
-  card.appendChild(grid);
+  left.appendChild(grid);
   const totals = bonuses();
   const lines = Object.entries(totals).filter(([, v]) => v).map(([k, v]) => `<li><span>${BONUS_LABELS[k]}</span><b>+${v}</b></li>`).join('');
-  card.appendChild(el('div', 'totals', `<h4>Total bonuses</h4><ul>${lines || '<li><span>None</span></li>'}</ul>`));
-  const close = el('button', 'btn', 'Close'); close.type = 'button'; close.addEventListener('click', closeModal);
+  left.appendChild(el('div', 'totals', `<h4>Total bonuses</h4><ul>${lines || '<li><span>None</span></li>'}</ul>`));
+
+  const right = el('div', 'inv-col');
+  right.appendChild(el('h4', '', 'Backpack · Gear'));
+  const gear = el('div', 'pack-grid');
+  p.backpack.forEach((id) => gear.appendChild(iconTile({ icon: EQUIPMENT[id].icon, tint: EQUIPMENT[id].tint, tip: equipTip(null, id), onclick: () => tryGear(() => equip(id)) })));
+  if (!p.backpack.length) gear.appendChild(el('div', 'pack-empty', 'No spare gear.'));
+  right.appendChild(gear);
+  right.appendChild(el('h4', '', `Backpack · Consumables <small>${p.quickbar.length}/${QUICKBAR_MAX} pinned</small>`));
+  const cons = el('div', 'pack-grid');
+  const owned = Object.keys(CONSUMABLES).filter((id) => (p.items[id] || 0) > 0 || p.quickbar.includes(id));
+  owned.forEach((id) => {
+    const pinned = p.quickbar.includes(id);
+    cons.appendChild(iconTile({
+      icon: CONSUMABLES[id].icon, tint: CONSUMABLES[id].tint, count: p.items[id] || 0, pressed: pinned, mark: pinned ? '★' : null, cls: pinned ? 'pinned' : '',
+      tip: itemTip(id, true), onclick: () => { const r = toggleQuick(id); if (!r.ok) Fx.floatText('player', r.reason, 'blocked'); Sfx.play('click'); renderInventory(); },
+    }));
+  });
+  if (!owned.length) cons.appendChild(el('div', 'pack-empty', 'No consumables.'));
+  right.appendChild(cons);
+  right.appendChild(el('p', 'pack-help', 'Click gear to equip or unequip it. Click a consumable to pin it to the action bar (★).'));
+
+  cols.append(left, right);
+  card.appendChild(cols);
+  const close = el('button', 'btn', 'Close <kbd>Esc</kbd>'); close.type = 'button'; close.addEventListener('click', closeModal);
   card.appendChild(close);
+  refreshTipAfterRender();
+}
+function openInventory() {
+  UI.inventoryOpen = true;
+  renderInventory();
   $('modal').hidden = false;
 }
 
@@ -280,7 +364,7 @@ function initUI() {
     switch (ev.type) {
       case 'log': appendLog(ev.text, ev.cls); break;
       case 'new': rebuildLog(); renderAll(); break;
-      case 'render': renderAll(); break;
+      case 'render': renderAll(); if (UI.inventoryOpen) renderInventory(); break;
       default: Fx.handle(ev);
     }
   });
@@ -293,20 +377,23 @@ function initUI() {
   for (const evt of ['pointerdown', 'keydown']) document.addEventListener(evt, () => Sfx.unlock(), { once: true });
   $('banner-restart').addEventListener('click', () => newBattle(G.enemyId));
 
-  const wrap = document.querySelector('.moves-wrap'), pop = $('moves-pop'), btn = $('moves-btn');
+  const wrap = $('e-corner'), pop = $('info-pop');
   let pinned = false;
-  const setPop = (v) => { pop.hidden = !v; };
+  const setPop = (v) => { pop.hidden = !v; wrap.classList.toggle('open', v); };
   wrap.addEventListener('mouseenter', () => setPop(true));
   wrap.addEventListener('mouseleave', () => { if (!pinned) setPop(false); });
-  btn.addEventListener('click', () => { pinned = !pinned; setPop(pinned); });
+  UI.toggleInfo = () => { pinned = !pinned; setPop(pinned); };
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { closeModal(); pinned = false; setPop(false); return; }
-    if (e.target.tagName === 'INPUT' || !$('modal').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target.tagName === 'INPUT' || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'i' || e.key === 'I') { if ($('modal').hidden) openInventory(); else closeModal(); return; }
+    if (!$('modal').hidden) return;
     if (e.key === 'e' || e.key === 'E') endTurn();
+    else if (e.key === 'q' || e.key === 'Q') switchBar();
     const n = parseInt(e.key, 10);
-    if (n >= 1 && n <= 6) useAction(ACTION_ORDER[n - 1]);
-    else if (n >= 7 && n <= 9) useItem(ITEM_ORDER[n - 7]);
+    if (n >= 1 && n <= 9) { const entry = barEntries()[n - 1]; if (entry) entry.run(); }
   });
+  $('end-turn').addEventListener('click', () => endTurn());
 }
 initUI();
