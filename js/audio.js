@@ -139,6 +139,22 @@ const Sfx = (() => {
     turn() { tone({ f: 523, d: 0.25, g: 0.06 }); tone({ f: 784, t: 0.08, d: 0.3, g: 0.05 }); },
     victory() { [523, 659, 784, 1047].forEach((f, i) => tone({ type: 'triangle', f, t: i * 0.13, d: i === 3 ? 0.8 : 0.25, g: 0.18 })); },
     defeat() { [392, 349, 311, 262].forEach((f, i) => tone({ type: 'triangle', f, t: i * 0.22, d: i === 3 ? 1 : 0.3, g: 0.16 })); },
+    step() { [0, 0.16, 0.32].forEach((t) => { noise({ t, d: 0.06, g: 0.2, type: 'lowpass', f: 500 }); tone({ f: 90, f2: 60, t, d: 0.06, g: 0.15 }); }); },
+    chestOpen() {
+      tone({ type: 'sawtooth', f: 90, f2: 140, a: 0.05, d: 0.35, g: 0.05 }); // creak
+      noise({ a: 0.05, d: 0.3, g: 0.08, type: 'bandpass', f: 600, f2: 1200, q: 8 });
+      [0.35, 0.42, 0.5, 0.56, 0.66, 0.74].forEach((t, i) => metal(1800 + i * 210, { t, d: 0.18, g: 0.05 })); // coins
+      [784, 988, 1175, 1568].forEach((f, i) => tone({ type: 'triangle', f, t: 0.5 + i * 0.09, d: 0.4, g: 0.07 }));
+    },
+    restHeal() { [392, 494, 587, 784].forEach((f, i) => tone({ type: 'triangle', f, t: i * 0.12, a: 0.03, d: 0.7, g: 0.08 })); noise({ a: 0.2, d: 0.8, g: 0.05, type: 'lowpass', f: 900 }); },
+    scavenge() { for (let i = 0; i < 6; i++) noise({ t: i * 0.08 + Math.random() * 0.04, d: 0.06, g: 0.12, type: 'bandpass', f: rnd(800, 2400), q: 2 }); metal(1300, { t: 0.5, d: 0.2, g: 0.05 }); },
+    fanfare() {
+      const notes = [[523, 0], [659, 0.15], [784, 0.3], [1047, 0.45], [784, 0.75], [1047, 0.9]];
+      notes.forEach(([f, t], i) => { tone({ type: 'triangle', f, t, d: i === notes.length - 1 ? 1.2 : 0.3, g: 0.17 }); tone({ type: 'sine', f: f / 2, t, d: 0.3, g: 0.06 }); });
+    },
+    slime() { tone({ f: 300, f2: 120, a: 0.01, d: 0.18, g: 0.2, vib: 20 }); noise({ d: 0.15, g: 0.15, type: 'lowpass', f: 600 }); },
+    hex() { tone({ type: 'triangle', f: 220, f2: 330, a: 0.08, d: 0.45, g: 0.1, vib: 8 }); tone({ type: 'triangle', f: 233, f2: 311, a: 0.08, d: 0.45, g: 0.08, vib: 7 }); },
+    heal() { tone({ f: 523, f2: 784, a: 0.05, d: 0.35, g: 0.08 }); tone({ f: 659, f2: 988, t: 0.06, a: 0.05, d: 0.35, g: 0.06 }); },
     page() { noise({ a: 0.02, d: 0.12, g: 0.12, f: 1800, f2: 900, q: 1.5 }); tone({ f: 660, d: 0.06, g: 0.03 }); },
     equip() { noise({ d: 0.08, g: 0.15, type: 'lowpass', f: 900 }); metal(980, { t: 0.05, d: 0.2, g: 0.06 }); },
     unequip() { noise({ d: 0.1, g: 0.14, type: 'lowpass', f: 700 }); tone({ f: 240, f2: 180, d: 0.08, g: 0.15 }); },

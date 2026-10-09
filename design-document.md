@@ -4,7 +4,7 @@ Status: **v0 prototype scope.** This document records decisions made so far. Any
 
 ## 1. Vision
 
-A turn-based, purely UI-driven strategy prototype. No moving characters and no real-time action: buttons, gauges, menus, panels and a combat log. Heavily inspired by *Slay the Spire*. The long-term shape is a run of multiple fights, out-of-combat events and a map. **The prototype is a single fight.**
+A turn-based, purely UI-driven strategy prototype. No moving characters and no real-time action: buttons, gauges, menus, panels and a combat log. Heavily inspired by *Slay the Spire*. **A run** is a walk across a small branching map of fights, chests and rest sites, ending at the treasure (section 15).
 
 Tone: mildly dark, cozy fantasy.
 
@@ -24,7 +24,10 @@ menu_fight/
 │   ├── data.js      # player, enemies, actions, statuses, items (pure data)
 │   ├── state.js     # battle state + helpers
 │   ├── engine.js    # turn loop, damage pipeline, status handling, enemy AI
-│   ├── ui.js        # render(state), tooltips, modals, input wiring
+│   ├── run.js       # the run: map, node outcomes, loot, save/load
+│   ├── views.js     # map, chest, rest site, victory/game-over screens, top bar
+│   ├── scenes.js    # SVG scene art (chest, rest site, victory)
+│   ├── ui.js        # battle screen: render, tooltips, inventory modal, input
 │   ├── cli.js       # combat-log command line + debug commands
 │   ├── audio.js     # procedural sound effects (Web Audio API, no audio files)
 │   ├── fx.js        # visual effects + mapping engine events to sounds
@@ -197,6 +200,11 @@ Resting is **not** an in-combat action. It belongs to future out-of-combat event
 | **Burn** | enemy | 2 turns per stack | Deals **5 damage** at the end of the afflicted creature's turn per stack. Stacks up to **3**. Each stack keeps **its own independent duration**, so the 3rd Fireball does not refresh the 1st. A 4th application while at 3 stacks is wasted, or replaces the oldest stack **(assumption: replaces the oldest)**. |
 | **Frozen** | enemy | 1 turn | The enemy deals **40% less** damage. Reapplying refreshes; it does not stack. |
 | **Lightning Shield** | player | until toggled off | See section 7. |
+| **Bleed** | player | 3 turns | 4 damage at the end of each of your turns (block applies). Reapplying refreshes. |
+| **Weakened** | player | 2 turns | You deal 25% less damage (all attacks and spells). |
+| **Slowed** | player | 1 turn | Stamina regenerates 50% slower at the start of your next turn. |
+| **Enraged** | enemy | until its next attack | Its next attack deals +6 damage per hit, then Enraged is consumed. |
+| **Thorns** | enemy | 2 turns | Each of your Attacks and Heavy Attacks takes 3 damage back (block applies). |
 
 Statuses are defined as data in `data.js` (name, icon, description, stacking rule, hooks) so new ones can be added without touching the engine.
 
@@ -280,7 +288,57 @@ An undead guardian of an old tomb, a hollow suit of corroded plate with a cold b
 - If the player has more than 15 block, it never starts a windup (to avoid wasting it) and uses *Rusted Cleave*.
 - Otherwise: Cleave 60%, Chill 25%, Bulwark 15% (Bulwark is not repeated back to back).
 
-The v0 fight uses **Grubnik** by default. `spawn warden` in the CLI switches to the Warden (see below).
+### 10.3 Gloop, the Bog Slime: Lv 1
+
+A quivering green heap with something old floating inside it. **HP 130.**
+
+| Move | Effect |
+|---|---|
+| **Belly Slam** | 9 damage. |
+| **Sticky Spit** | 6 damage and Slowed (thrown as a projectile). |
+| **Ooze Together** | Heals 12 and gains 8 block. |
+
+**Intellect:** pulls itself together below 50% HP (at most once every 3 turns). It spits less if you are already Slowed, and doesn't repeat a move three times.
+
+### 10.4 Thornback Boar: Lv 2
+
+A bristling boar with brambles grown into its back. **HP 210.**
+
+| Move | Effect |
+|---|---|
+| **Tusk Rip** | 13 damage (heavy). |
+| **Gore** | 9 damage and Bleed. |
+| **Paw the Earth** | Gains 12 block and becomes Enraged. |
+
+**Intellect:** after pawing it always charges, with Gore if you aren't bleeding and Tusk Rip if you are. It prefers Gore when you aren't bleeding.
+
+### 10.5 Mother Nettle, the Hedge Witch: Lv 2
+
+Pointed hat, nettle-green staff, no patience for visitors. **HP 180.**
+
+| Move | Effect |
+|---|---|
+| **Thorn Bolt** | 15 damage (projectile). |
+| **Hex of Frailty** | Weakened for 2 turns. |
+| **Bramble Ward** | Gains 10 block and Thorns. |
+| **Nettle Brew** | Heals 18. |
+
+**Intellect:** opens with the Hex and re-hexes when it wears off. She brews below 45% HP (at most once every 3 turns) and never wards twice in a row.
+
+### 10.6 Old Ironbark: Lv 3
+
+An ancient oak with amber eyes and a moss beard. **HP 450.** Trait **Dry bark**: takes 50% more damage from Fireball and Burn.
+
+| Move | Effect |
+|---|---|
+| **Branch Sweep** | 2 hits of 11 (heavy). |
+| **Root Grasp** | 14 damage and Slowed. |
+| **Bark Skin** | Gains 20 block and Thorns. |
+| **Sap Mend** | Heals 30. |
+
+**Intellect:** mends below 50% HP (at most once every 3 turns). Otherwise it favours Branch Sweep, grasps less if you are already Slowed, and never uses Bark Skin twice in a row.
+
+**Enemy pools by level:** Lv 1 Grubnik, Gloop · Lv 2 Thornback Boar, Mother Nettle · Lv 3 Barrow Warden, Old Ironbark. `spawn <enemy>` in the CLI starts a practice fight against any of them.
 
 ## 11. Combat log and CLI
 
@@ -291,8 +349,10 @@ Initial command set (extensible; each command is a small entry in a table in `cl
 | Command | Behaviour |
 |---|---|
 | `help` | List commands. |
-| `restart` | Restart the fight with the current enemy. |
-| `spawn <enemy>` | Start a new fight against an enemy id (`grubnik`, `warden`). |
+| `restart` | Restart the current fight from its first turn (your state from when it began). |
+| `spawn <enemy>` | Practice fight against any enemy (`grubnik`, `gloop`, `boar`, `witch`, `warden`, `treant`). |
+| `goto <row> <col>` | Teleport to a map node and enter it (`goto 2 3`, `goto 4 1` for the treasure). |
+| `map` / `nodes` / `newrun` | Return to the map / list nodes and their enemies / abandon the run. |
 | `set <hp\|mana\|stamina\|block> <n>` | Set a player value. |
 | `enemy set <hp\|block> <n>` | Set an enemy value. |
 | `heal <n>` / `damage <n>` | Heal or damage the player. |
@@ -317,11 +377,11 @@ Initial command set (extensible; each command is a small entry in a table in `cl
 7. **Combat log and CLI.**
 8. **Polish:** bar transitions, floating damage numbers, hit flashes, keyboard shortcuts.
 
-## 13. Out of scope for v0
+## 13. Out of scope for now
 
-Map, multiple fights, out-of-combat events, rewards, deck/relic-style progression, saving, mobile layout.
+Procedurally generated maps, shops, gold, card/relic-style progression, levelling up, mobile layout.
 
-## 14. Open questions / assumptions to confirm
+## 14. Assumptions accepted so far
 
 1. Several actions per turn plus an End Turn button (section 6.2).
 2. Lightning Shield costs 10 mana **per turn** as upkeep, rather than once (section 7).
@@ -329,3 +389,87 @@ Map, multiple fights, out-of-combat events, rewards, deck/relic-style progressio
 4. A fourth Burn stack replaces the oldest one (section 8).
 5. Placeholder consumables (section 9.1) and the demo equipment stats: sword +1 attack damage, shield +1 block, helm none (section 9.2).
 6. `index.html` opens straight from disk, using classic scripts rather than ES modules (section 2).
+
+## 15. The run and the map
+
+### 15.1 The map
+
+The game starts on the **map view** with the knight on node 0. The map is drawn bottom to top, like *Slay the Spire*. Nodes are labelled **row·column**; row 0 is the start and the star is the goal.
+
+```
+row 4            ★
+row 3    rest   fight   fight
+row 2    rest   chest   fight
+row 1    fight  fight   chest
+row 0            0
+```
+
+- Node 0 leads to every node in row 1, and every row 3 node leads to the star.
+- Every node leads to the node straight ahead (same column).
+- Extra paths: **1·1 → 2·2**, **2·3 → 3·2**, **2·2 → 3·3**.
+- Reachable nodes glow, the paths you can take are animated, the road you walked is inked red, and visited nodes get a check mark. Hovering a node shows its type and, for fights, the enemy level.
+- Clicking a reachable node walks the knight token there, then opens the node.
+
+**Node types** (map icons): **Fight** (monster head), **Chest** (chest), **Rest site** (campfire), **Treasure** (star).
+
+**Enemies** are assigned when a run starts: each fight gets a random enemy from the pool whose level matches its row, without repeats within a row.
+
+### 15.2 What carries over
+
+- HP, mana, gear, backpack, consumables and pinned items persist across the run.
+- At the start of every fight stamina is full. Block and status effects reset, and Lightning Shield starts off.
+- Mana does **not** regenerate between fights. Only resting, Mana Tonics and the in-fight +10/turn restore it.
+- Equipment and pins can be changed anywhere off the battle screen, or on your own turn in a fight.
+
+### 15.3 Fights
+
+- **Win:** the enemy drops **one random potion** (Healing Draught, Mana Tonic or Stamina Tincture), shown on the victory banner. "Continue to the map" returns to the map.
+- **Lose:** the defeat banner leads to the **Run over** summary (fights won, chests, rests, gear found), then a new run.
+
+### 15.4 Chest
+
+The scene shows a closed chest. Clicking it opens it (creak and coin sounds, golden glow) and reveals **one random wearable** from the loot pool, preferring items you don't own yet. It goes into the backpack, and an **Equip now** button equips it on the spot. You can also leave without opening it.
+
+### 15.5 Rest site
+
+The scene shows the knight sitting on a log by a campfire, next to a tent. Choose **one** of:
+
+| Option | Effect |
+|---|---|
+| **Rest** | Restore 30% of max HP and 30% of max mana (75 HP / 120 mana at base stats). |
+| **Scavenge for supplies** | 2–3 random consumables. |
+| **Scavenge for loot** | One random wearable (same rules as a chest). |
+
+### 15.6 Victory
+
+The star leads to the victory screen: the knight hugging a princess in front of a pile of gold, with a fanfare, the run summary and a "Start a new run" button.
+
+### 15.7 Loot pool
+
+Small bonuses using the existing stat types plus **Max HP** (raising max HP does not heal; removing the gear clamps HP).
+
+| Item | Slot | Bonus |
+|---|---|---|
+| Hedge-Mage's Hood | Head | +1 spell damage, +5 max HP |
+| Iron Barbute | Head | +15 max HP |
+| Padded Gambeson | Chest | +20 max HP |
+| Steel Cuirass | Chest | +30 max HP, +1 block from Defend |
+| Leather Greaves | Legs | +15 max HP |
+| Plated Greaves | Legs | +25 max HP |
+| Iron Gauntlets | Gloves | +2 Attack damage |
+| Duelist's Gloves | Gloves | +1 Attack, +1 Heavy Attack damage |
+| Bastard Sword | Main hand | +2 Attack, +3 Heavy Attack damage |
+| Kite Shield | Off hand | +3 block from Defend |
+| Bronze Ring | Ring | +2 spell damage |
+| Ring of Embers | Ring | +3 spell damage |
+| Ring of Vigor | Ring | +15 max HP |
+
+### 15.8 Saving
+
+The run is saved to the browser (localStorage) whenever it changes outside a fight. Reloading the page resumes the run. A reload during a fight restarts that fight from the state you entered it with. **New run** in the top bar (click twice to confirm) or the `newrun` command starts over.
+
+### 15.9 Screens
+
+- **Top bar** (map, chest and rest screens): backpack button, name, HP and mana bars, depth, New run.
+- **Combat log and CLI** stay at the bottom on every screen.
+- Switching screens fades the new one in.

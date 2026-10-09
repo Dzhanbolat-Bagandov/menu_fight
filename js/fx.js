@@ -133,10 +133,10 @@ const Fx = (() => {
   }
 
   /* ---- event -> effects + sound ---- */
-  const HIT_SOUND = { light: 'hit', heavy: 'heavyHit', fire: 'fireImpact', frost: 'frostImpact', lightning: 'zap', burn: 'burn', raw: 'hit' };
+  const HIT_SOUND = { light: 'hit', heavy: 'heavyHit', fire: 'fireImpact', frost: 'frostImpact', lightning: 'zap', burn: 'burn', bleed: 'hit', thorns: 'hit', raw: 'hit' };
   const SPARKS = {
     light: ['#fff3c4', '#ffd36b', '#ffffff'], heavy: ['#ffe08a', '#ff9b3d', '#ffffff'], raw: ['#ffd36b'],
-    fire: ['#ffb347', '#ff6a2c', '#ffe27a'], burn: ['#ff8a3d', '#ffcc66'], frost: ['#d6f3ff', '#8fd3ff', '#ffffff'], lightning: ['#e8d4ff', '#b48cff', '#f4d35e'],
+    fire: ['#ffb347', '#ff6a2c', '#ffe27a'], burn: ['#ff8a3d', '#ffcc66'], bleed: ['#c4261e', '#ff6a5a'], thorns: ['#a7c47a', '#5b7a3a'], frost: ['#d6f3ff', '#8fd3ff', '#ffffff'], lightning: ['#e8d4ff', '#b48cff', '#f4d35e'],
   };
   const ELEMENTAL = new Set(['fire', 'frost', 'lightning', 'burn']);
   const play = (n) => Sfx.play(n);
@@ -146,6 +146,8 @@ const Fx = (() => {
     if (kind === 'lightning') boltFx(side);
     if (kind === 'fire') iconPop(side, 'fireball');
     if (kind === 'burn') iconPop(side, 'burn', 'small');
+    if (kind === 'bleed') iconPop(side, 'bleed', 'small');
+    if (kind === 'thorns') iconPop(side, 'thorns', 'small');
     if (kind === 'frost') iconPop(side, 'frozen');
     if (absorbed > 0) {
       if (broke) { play('shieldBreak'); shieldFx(side, 'break'); }
@@ -155,8 +157,8 @@ const Fx = (() => {
     if (dealt > 0) {
       if (!ELEMENTAL.has(kind)) play(HIT_SOUND[kind] || 'hit');
       if (side === 'player' && !ELEMENTAL.has(kind)) play('hurt');
-      sparks(side, SPARKS[kind] || SPARKS.raw, kind === 'heavy' ? 20 : kind === 'burn' ? 6 : 12, { spread: kind === 'heavy' ? 110 : 75, size: kind === 'heavy' ? 1.4 : 1 });
-      recoil(side, kind === 'heavy' ? 26 : kind === 'burn' ? 5 : 13);
+      sparks(side, SPARKS[kind] || SPARKS.raw, kind === 'heavy' ? 20 : kind === 'burn' || kind === 'bleed' ? 6 : 12, { spread: kind === 'heavy' ? 110 : 75, size: kind === 'heavy' ? 1.4 : 1 });
+      recoil(side, kind === 'heavy' ? 26 : kind === 'burn' || kind === 'bleed' ? 5 : 13);
       flash(side);
       floatText(side, `-${dealt}`, 'dmg');
     }
@@ -173,6 +175,9 @@ const Fx = (() => {
           if (ev.element === 'fire') { play('fireCast'); projectile(s, 'fireball', '#ff8a2c'); }
           else if (ev.element === 'frost') { play('frostCast'); projectile(s, 'frost_arrow', '#8fd3ff'); }
           else if (ev.element === 'chill') { play('chill'); projectile(s, 'skull', '#6fd3ff'); }
+          else if (ev.element === 'slime') { play('slime'); projectile(s, 'slime', '#8fd060'); }
+          else if (ev.element === 'thorn') { play('swing'); projectile(s, 'thorns', '#a7c47a'); }
+          else if (ev.element === 'hex') { play('hex'); projectile(s, 'weakened', '#b48cff'); }
         } else if (ev.style === 'guard') lunge(s, -12, 0, 260);
         else if (ev.style === 'windup') { play('windup'); hop(s, 16, 500); }
         break;
@@ -183,6 +188,9 @@ const Fx = (() => {
           if (ev.id === 'stunned') { play('stun'); wobble(s); }
           else if (ev.id === 'staggered') { play('stagger'); wobble(s); }
           else if (ev.id === 'lightning') { play('lightningOn'); sparks(s, SPARKS.lightning, 14, { spread: 90 }); }
+          else if (ev.id === 'enraged') { play('stagger'); hop(s, 14); sparks(s, ['#ff6a4a', '#ffcf4a'], 10, { spread: 70 }); }
+          else if (ev.id === 'thorns') { play('scavenge'); sparks(s, SPARKS.thorns, 12, { spread: 80 }); }
+          else if (ev.id === 'weakened' || ev.id === 'slowed' || ev.id === 'bleed') wobble(s);
         } else if (ev.op === 'remove' && ev.id === 'lightning') play('lightningOff');
         else if (ev.op === 'immune') { play('immune'); floatText(s, 'Immune', 'blocked'); }
         break;
@@ -190,6 +198,7 @@ const Fx = (() => {
       case 'drain': play('drain'); floatText(s, `-${ev.amount} mana`, 'mana'); sparks(s, ['#6fb0f2', '#bfe6ff'], 10, { spread: 60 }); break;
       case 'item': play('potion'); break;
       case 'restore':
+        if (ev.side === 'enemy' && ev.res === 'hp') play('heal');
         if (ev.amount) floatText(s, `+${ev.amount}${ev.res === 'hp' ? '' : ' ' + ev.res}`, ev.res === 'hp' ? 'heal' : ev.res);
         sparks(s, ev.res === 'hp' ? ['#8be07a', '#d8ffcc'] : ev.res === 'mana' ? ['#6fb0f2', '#bfe6ff'] : ['#e6c75a', '#fff1b0'], 8, { spread: 50 });
         break;

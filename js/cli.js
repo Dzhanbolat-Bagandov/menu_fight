@@ -13,25 +13,30 @@ function setStat(c, stat, v) {
   c[stat] = Math.max(0, max ? Math.min(max, v) : v);
 }
 const creatureOf = (who) => {
-  if (who === 'player') return G.player;
+  if (who === 'player') return PLAYER;
   if (who === 'enemy') return G.enemy;
   throw new Error('Target must be "player" or "enemy"');
 };
 
 const COMMANDS = {
   help: { usage: 'help', desc: 'List commands.', run() { for (const [k, c] of Object.entries(COMMANDS)) log(`  ${c.usage.padEnd(38)} ${c.desc}`, 'sys'); } },
-  restart: { usage: 'restart', desc: 'Restart the fight with the current enemy.', run() { newBattle(G.enemyId); } },
-  spawn: { usage: 'spawn <enemy>', desc: `Start a fight (${Object.keys(ENEMIES).join(', ')}).`, run([id]) { newBattle(id); } },
-  set: { usage: 'set <hp|mana|stamina|block> <n>', desc: 'Set a player value.', run([stat, n]) { setStat(G.player, stat, num(n)); log(`Player ${stat} set to ${G.player[stat]}.`, 'sys'); checkEnd(); render(); } },
+  restart: { usage: 'restart', desc: 'Restart the current fight from its first turn.', run() { restartFight(); } },
+  spawn: { usage: 'spawn <enemy>', desc: `Start a practice fight here (${Object.keys(ENEMIES).join(', ')}).`, run([id]) { if (!ENEMIES[id]) throw new Error(`Unknown enemy "${id}"`); startFight(id, null); } },
+  goto: { usage: 'goto <row> <col>', desc: 'Teleport to a map node and enter it (e.g. goto 2 3, goto 4 1).', run([r, c = 1]) { enterNode(`${num(r)}-${num(c)}`, { force: true }); } },
+  map: { usage: 'map', desc: 'Leave the current node and return to the map.', run() { backToMap(); } },
+  newrun: { usage: 'newrun', desc: 'Abandon this run and start a new one.', run() { newRun(); } },
+  nodes: { usage: 'nodes', desc: 'List the map nodes and their contents.', run() { for (const n of Object.values(RUN.map.nodes)) log(`  ${n.id.padEnd(4)} ${n.type}${n.enemy ? ` (${ENEMIES[n.enemy].name})` : ''}${n.id === RUN.at ? '  <- you' : ''}`, 'sys mono'); } },
+  set: { usage: 'set <hp|mana|stamina|block> <n>', desc: 'Set a player value.', run([stat, n]) { setStat(PLAYER, stat, num(n)); log(`Player ${stat} set to ${PLAYER[stat]}.`, 'sys'); if (G) checkEnd(); render(); } },
   enemy: {
     usage: 'enemy set <hp|block> <n>', desc: 'Set an enemy value.',
     run([sub, stat, n]) {
+      if (!G) throw new Error('Not in a fight.');
       if (sub !== 'set' || !['hp', 'block'].includes(stat)) throw new Error('Usage: enemy set <hp|block> <n>');
       setStat(G.enemy, stat, num(n)); log(`Enemy ${stat} set to ${G.enemy[stat]}.`, 'sys'); checkEnd(); render();
     },
   },
-  heal: { usage: 'heal <n>', desc: 'Heal the player.', run([n]) { const p = G.player; p.hp = Math.min(p.maxHp, p.hp + num(n)); log(`Healed to ${p.hp}.`, 'sys'); render(); } },
-  damage: { usage: 'damage <n>', desc: 'Damage the player (block applies).', run([n]) { const r = dealDamage(G.player, num(n)); log(`Player takes ${hitText(r)}.`, 'sys'); checkEnd(); render(); } },
+  heal: { usage: 'heal <n>', desc: 'Heal the player.', run([n]) { const p = PLAYER; p.hp = Math.min(p.maxHp, p.hp + num(n)); log(`Healed to ${p.hp}.`, 'sys'); render(); } },
+  damage: { usage: 'damage <n>', desc: 'Damage the player (block applies, in a fight).', run([n]) { if (!G) throw new Error('Not in a fight.'); const r = dealDamage(PLAYER, num(n)); log(`Player takes ${hitText(r)}.`, 'sys'); if (G) checkEnd(); render(); } },
   status: {
     usage: 'status <add|remove> <player|enemy> <id> [turns]', desc: `Apply or remove a status (${Object.keys(STATUSES).join(', ')}).`,
     run([op, who, id, turns]) {
@@ -48,8 +53,8 @@ const COMMANDS = {
   give: {
     usage: 'give <item> [n]', desc: `Add consumables or gear to the backpack (${[...Object.keys(CONSUMABLES), ...Object.keys(EQUIPMENT)].join(', ')}).`,
     run([id, n = 1]) {
-      if (CONSUMABLES[id]) { G.player.items[id] = (G.player.items[id] || 0) + num(n); log(`Gave ${n} x ${CONSUMABLES[id].name}.`, 'sys'); }
-      else if (EQUIPMENT[id]) { for (let i = 0; i < num(n); i++) G.player.backpack.push(id); log(`Gave ${n} x ${EQUIPMENT[id].name}.`, 'sys'); }
+      if (CONSUMABLES[id]) { PLAYER.items[id] = (PLAYER.items[id] || 0) + num(n); log(`Gave ${n} x ${CONSUMABLES[id].name}.`, 'sys'); }
+      else if (EQUIPMENT[id]) { for (let i = 0; i < num(n); i++) PLAYER.backpack.push(id); log(`Gave ${n} x ${EQUIPMENT[id].name}.`, 'sys'); }
       else throw new Error(`Unknown item "${id}"`);
       render();
     },
@@ -57,8 +62,8 @@ const COMMANDS = {
   equip: { usage: 'equip <item> [slot]', desc: `Equip gear, conjuring it if it is not in the backpack (slots: ${SLOTS.map((s) => s.id).join(', ')}).`, run([id, slot]) { equip(id, slot, { conjure: true }); } },
   unequip: { usage: 'unequip <slot>', desc: 'Move gear from a slot to the backpack.', run([slot]) { unequip(slot); } },
   pin: { usage: 'pin <item>', desc: 'Pin or unpin a consumable on the action bar.', run([id]) { const r = toggleQuick(id); if (!r.ok) throw new Error(r.reason); } },
-  intent: { usage: 'intent <moveId>', desc: 'Force the enemy\'s next move.', run([id]) { if (!G.enemy.def.moves[id]) throw new Error(`Unknown move "${id}" (${Object.keys(G.enemy.def.moves).join(', ')})`); G.enemy.intent = id; log(`Enemy intent set to ${id}.`, 'sys'); render(); } },
-  god: { usage: 'god', desc: 'Toggle an invulnerable player.', run() { G.god = !G.god; log(`God mode ${G.god ? 'on' : 'off'}.`, 'sys'); } },
+  intent: { usage: 'intent <moveId>', desc: 'Force the enemy\'s next move.', run([id]) { if (!G) throw new Error('Not in a fight.'); if (!G.enemy.def.moves[id]) throw new Error(`Unknown move "${id}" (${Object.keys(G.enemy.def.moves).join(', ')})`); G.enemy.intent = id; log(`Enemy intent set to ${id}.`, 'sys'); render(); } },
+  god: { usage: 'god', desc: 'Toggle an invulnerable player (in a fight).', run() { if (!G) throw new Error('Not in a fight.'); G.god = !G.god; log(`God mode ${G.god ? 'on' : 'off'}.`, 'sys'); } },
   sound: {
     usage: 'sound [on|off|<0-100>|<name>]', desc: 'Toggle sound, set volume, or play a sound by name.',
     run([arg]) {
@@ -69,8 +74,8 @@ const COMMANDS = {
       Sfx.play(arg);
     },
   },
-  clear: { usage: 'clear', desc: 'Clear the log.', run() { G.log = []; $('log').innerHTML = ''; } },
-  state: { usage: 'state', desc: 'Dump the battle state as JSON.', run() { const { log: _l, ...rest } = G; const s = JSON.stringify(rest, (k, v) => (k === 'def' ? v.id : v), 1); s.split('\n').forEach((l) => log(l, 'sys mono')); } },
+  clear: { usage: 'clear', desc: 'Clear the log.', run() { LOG = []; $('log').innerHTML = ''; } },
+  state: { usage: 'state', desc: 'Dump the battle (or run) state as JSON.', run() { const s = JSON.stringify(G || { ...RUN, map: undefined }, (k, v) => (k === 'def' ? v.id : v), 1); s.split('\n').forEach((l) => log(l, 'sys mono')); } },
 };
 
 function runCommand(line) {
@@ -78,7 +83,7 @@ function runCommand(line) {
   const cmd = COMMANDS[parts[0].toLowerCase()];
   log(`> ${line}`, 'cmd');
   if (!cmd) { log(`Unknown command "${parts[0]}". Type help.`, 'err'); return; }
-  try { cmd.run(parts.slice(1)); } catch (err) { log(err.message, 'err'); }
+  try { cmd.run(parts.slice(1)); if (RUN && RUN.view !== 'battle') { saveRun(); Views.refresh(); } } catch (err) { log(err.message, 'err'); }
 }
 
 (function initCLI() {

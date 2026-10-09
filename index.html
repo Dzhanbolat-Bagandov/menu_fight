@@ -8,31 +8,41 @@
 </head>
 <body>
   <main id="app">
-    <section class="panel" id="player-panel" aria-label="Player">
-      <header class="nameplate"><div class="corner" id="p-corner"></div><h2 id="p-name"></h2><span class="lv" id="p-lv"></span></header>
-      <div class="stage"><div class="sprite" id="p-sprite"></div><div class="floats" id="p-floats"></div></div>
-      <div class="bars">
-        <div class="row hp-row"><div class="block-badge" id="p-block"></div><div class="bar hp"><div class="fill" id="p-hp-fill"></div><span class="bar-label"><b>HP</b> <span id="p-hp-txt"></span></span></div></div>
-        <div class="row"><div class="block-badge"></div><div class="bar mana"><div class="fill" id="p-mana-fill"></div><span class="bar-label"><b>Mana</b> <span id="p-mana-txt"></span></span></div></div>
-        <div class="row"><div class="block-badge"></div><div class="bar stamina"><div class="fill" id="p-stam-fill"></div><span class="bar-label"><b>Stamina</b> <span id="p-stam-txt"></span></span></div></div>
-      </div>
-      <div class="statuses" id="p-status"></div>
-      <div class="bottom actionbar">
-        <div class="bar-toggle" id="bar-toggle"></div>
-        <div class="bar-viewport" id="bar-viewport"><div class="bar-page current"></div></div>
-        <button class="btn primary end-turn" id="end-turn" type="button"></button>
-      </div>
-    </section>
+    <div id="views">
+      <header id="topbar" hidden></header>
+      <section class="view" id="battle-view" hidden>
+      <section class="panel" id="player-panel" aria-label="Player">
+        <header class="nameplate"><div class="corner" id="p-corner"></div><h2 id="p-name"></h2><span class="lv" id="p-lv"></span></header>
+        <div class="stage"><div class="sprite" id="p-sprite"></div><div class="floats" id="p-floats"></div></div>
+        <div class="bars">
+          <div class="row hp-row"><div class="block-badge" id="p-block"></div><div class="bar hp"><div class="fill" id="p-hp-fill"></div><span class="bar-label"><b>HP</b> <span id="p-hp-txt"></span></span></div></div>
+          <div class="row"><div class="block-badge"></div><div class="bar mana"><div class="fill" id="p-mana-fill"></div><span class="bar-label"><b>Mana</b> <span id="p-mana-txt"></span></span></div></div>
+          <div class="row"><div class="block-badge"></div><div class="bar stamina"><div class="fill" id="p-stam-fill"></div><span class="bar-label"><b>Stamina</b> <span id="p-stam-txt"></span></span></div></div>
+        </div>
+        <div class="statuses" id="p-status"></div>
+        <div class="bottom actionbar">
+          <div class="bar-toggle" id="bar-toggle"></div>
+          <div class="bar-viewport" id="bar-viewport"><div class="bar-page current"></div></div>
+          <button class="btn primary end-turn" id="end-turn" type="button"></button>
+        </div>
+      </section>
 
-    <section class="panel" id="enemy-panel" aria-label="Opponent">
-      <header class="nameplate"><div class="corner info-wrap" id="e-corner"><div class="info-pop" id="info-pop" hidden></div></div><h2 id="e-name"></h2><span class="lv" id="e-lv"></span></header>
-      <div class="stage"><div class="sprite" id="e-sprite"></div><div class="stun-stars" aria-hidden="true"><span>✦</span><span>✧</span><span>✦</span></div><div class="floats" id="e-floats"></div></div>
-      <div class="bars">
-        <div class="row hp-row"><div class="block-badge" id="e-block"></div><div class="bar hp"><div class="fill" id="e-hp-fill"></div><span class="bar-label"><b>HP</b> <span id="e-hp-txt"></span></span></div></div>
-      </div>
-      <div class="statuses" id="e-status"></div>
-      <div class="bottom intent-box" id="intent"></div>
-    </section>
+      <section class="panel" id="enemy-panel" aria-label="Opponent">
+        <header class="nameplate"><div class="corner info-wrap" id="e-corner"><div class="info-pop" id="info-pop" hidden></div></div><h2 id="e-name"></h2><span class="lv" id="e-lv"></span></header>
+        <div class="stage"><div class="sprite" id="e-sprite"></div><div class="stun-stars" aria-hidden="true"><span>✦</span><span>✧</span><span>✦</span></div><div class="floats" id="e-floats"></div></div>
+        <div class="bars">
+          <div class="row hp-row"><div class="block-badge" id="e-block"></div><div class="bar hp"><div class="fill" id="e-hp-fill"></div><span class="bar-label"><b>HP</b> <span id="e-hp-txt"></span></span></div></div>
+        </div>
+        <div class="statuses" id="e-status"></div>
+        <div class="bottom intent-box" id="intent"></div>
+      </section>
+        <div id="banner" hidden><div class="banner-card"><h1 id="banner-title"></h1><p id="banner-sub"></p><div id="banner-reward"></div><button class="btn big" id="banner-btn" type="button"></button></div></div>
+      </section>
+      <section class="view" id="map-view" hidden></section>
+      <section class="view" id="chest-view" hidden></section>
+      <section class="view" id="rest-view" hidden></section>
+      <section class="view" id="end-view" hidden></section>
+    </div>
 
     <section id="logbox" aria-label="Combat log">
       <button class="btn small" id="sound-btn" type="button">♪ Sound on</button>
@@ -40,8 +50,7 @@
       <form id="cli" autocomplete="off"><span class="prompt">&gt;</span><input id="cli-input" type="text" spellcheck="false" placeholder="type a command, e.g. help"></form>
     </section>
 
-    <div id="banner" hidden><div class="banner-card"><h1 id="banner-title"></h1><p id="banner-sub"></p><button class="btn big" id="banner-restart" type="button">Fight again</button></div></div>
-  </main>
+</main>
 
   <div id="tooltip" role="tooltip" hidden></div>
   <div id="modal" hidden><div class="modal-card" id="modal-card"></div></div>
@@ -51,9 +60,12 @@
   <script src="js/icons.js"></script>
   <script src="js/sprites.js"></script>
   <script src="js/audio.js"></script>
+  <script src="js/scenes.js"></script>
+  <script src="js/run.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/fx.js"></script>
+  <script src="js/views.js"></script>
   <script src="js/cli.js"></script>
-  <script>newBattle('grubnik');</script>
+  <script>resumeOrStart();</script>
 </body>
 </html>

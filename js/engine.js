@@ -4,7 +4,9 @@
    Actions run as timed step sequences (runSeq) so hits, ticks and statuses
    land one after another and the UI can animate and play sounds per step. */
 
-let G = null; // current battle
+let G = null; // current battle (null outside fights)
+let PLAYER = null; // the run's persistent player; G.player points at it during a fight
+let LOG = []; // combat log lines, kept across fights
 let battleSeq = 0;
 const Engine = {
   listeners: [],
@@ -23,10 +25,32 @@ const T = {
 };
 
 const emit = (ev) => Engine.listeners.forEach((f) => f(ev));
-function log(text, cls = '') { G.log.push({ text, cls }); emit({ type: 'log', text, cls }); }
+function log(text, cls = '') { LOG.push({ text, cls }); if (LOG.length > 400) LOG.splice(0, LOG.length - 400); emit({ type: 'log', text, cls }); }
 const render = () => emit({ type: 'render' });
-const sideOf = (c) => (c === G.player ? 'player' : 'enemy');
-const nameOf = (c) => (c === G.player ? G.player.name : G.enemy.def.name);
+const sideOf = (c) => (c === PLAYER ? 'player' : 'enemy');
+const nameOf = (c) => (c === PLAYER ? PLAYER.name : G.enemy.def.name);
+
+/* ---- the persistent player --------------------------------------------------- */
+
+function newPlayer() {
+  const r = RULES.player;
+  const p = {
+    name: r.name, level: r.level, hp: r.maxHp, maxHp: r.maxHp, mana: r.maxMana, maxMana: r.maxMana,
+    stamina: r.maxStamina, maxStamina: r.maxStamina, block: 0, statuses: [],
+    equipment: { ...DEFAULT_EQUIPMENT },
+    backpack: [...DEFAULT_BACKPACK],
+    quickbar: [...DEFAULT_QUICKBAR],
+    items: Object.fromEntries(Object.entries(CONSUMABLES).map(([k, v]) => [k, v.count])),
+  };
+  recalcPlayer(p);
+  p.hp = p.maxHp;
+  return p;
+}
+/* Derived stats from gear. Raising max HP does not heal; lowering it clamps HP. */
+function recalcPlayer(p = PLAYER) {
+  p.maxHp = RULES.player.maxHp + equipBonus('maxHp', p);
+  p.hp = Math.min(p.hp, p.maxHp);
+}
 
 /* ---- step sequencer ---------------------------------------------------------- */
 
@@ -54,13 +78,13 @@ function runSeq(steps) {
 
 /* ---- helpers --------------------------------------------------------------- */
 
-function equipBonus(key, p = G.player) {
+function equipBonus(key, p = PLAYER) {
   let sum = 0;
   for (const id of Object.values(p.equipment)) if (id) sum += EQUIPMENT[id].bonus[key] || 0;
   return sum;
 }
 function bonuses() {
-  return { lightDamage: equipBonus('lightDamage'), heavyDamage: equipBonus('heavyDamage'), defendBlock: equipBonus('defendBlock'), spellDamage: equipBonus('spellDamage') };
+  return Object.fromEntries(Object.keys(BONUS_LABELS).map((k) => [k, equipBonus(k)]));
 }
 const hasStatus = (c, id) => c.statuses.some((s) => s.id === id);
 const getStatus = (c, id) => c.statuses.find((s) => s.id === id);
@@ -68,19 +92,21 @@ function outMult(c) {
   let m = 1;
   if (hasStatus(c, 'staggered')) m *= RULES.staggered.dmgMult;
   if (hasStatus(c, 'frozen')) m *= RULES.frozen.dmgMult;
+  if (hasStatus(c, 'weakened')) m *= RULES.weakened.dmgMult;
   return m;
 }
 
 /* ---- core effects --------------------------------------------------------- */
 
-/* kind: light | heavy | fire | frost | lightning | burn | raw */
+/* kind: light | heavy | fire | frost | lightning | burn | bleed | thorns | raw */
 function dealDamage(target, amount, kind = 'raw') {
+  if (target !== PLAYER && target.def.fireMult && (kind === 'fire' || kind === 'burn')) amount *= target.def.fireMult;
   amount = Math.max(0, Math.round(amount));
   const hadBlock = target.block > 0;
   const absorbed = Math.min(target.block, amount);
   target.block -= absorbed;
   let dealt = amount - absorbed;
-  if (target === G.player && G.god) dealt = 0;
+  if (target === PLAYER && G.god) dealt = 0;
   target.hp = Math.max(0, target.hp - dealt);
   const broke = hadBlock && target.block === 0;
   emit({ type: 'damage', side: sideOf(target), kind, dealt, absorbed, broke });
@@ -93,27 +119,34 @@ function gainBlock(c, n) {
   emit({ type: 'block', side: sideOf(c), amount: n });
 }
 
-/* style: melee | heavy | cast | windup | guard; element: fire | frost | chill (for casts) */
+function heal(c, n) {
+  const gained = Math.min(n, c.maxHp - c.hp);
+  c.hp += gained;
+  emit({ type: 'restore', side: sideOf(c), res: 'hp', amount: gained });
+  return gained;
+}
+
+/* style: melee | heavy | cast | windup | guard; element (casts): fire | frost | chill | slime | thorn | hex */
 const act = (side, style, element) => emit({ type: 'act', side, style, element });
 
 function addStatus(target, id, turns) {
   const def = STATUSES[id];
   turns = turns ?? RULES[id]?.turns ?? null;
-  if (target === G.enemy && target.def.immune.includes(id)) {
+  if (target !== PLAYER && target.def.immune.includes(id)) {
     log(`${nameOf(target)} is immune to ${def.name}.`, 'status');
     emit({ type: 'status', side: sideOf(target), id, op: 'immune' });
     return false;
   }
-  if (id === 'burn') {
-    const stacks = target.statuses.filter((s) => s.id === 'burn');
-    if (stacks.length >= RULES.burn.maxStacks) target.statuses.splice(target.statuses.indexOf(stacks[0]), 1);
+  if (def.stacking === 'instances') {
+    const stacks = target.statuses.filter((s) => s.id === id);
+    if (stacks.length >= RULES[id].maxStacks) target.statuses.splice(target.statuses.indexOf(stacks[0]), 1);
     target.statuses.push({ id, turns });
   } else {
     const ex = getStatus(target, id);
     if (ex) ex.turns = ex.turns === null ? null : Math.max(ex.turns, turns);
     else target.statuses.push({ id, turns });
   }
-  log(`${nameOf(target)} is ${id === 'burn' ? 'burning' : def.name}.`, 'status');
+  log(`${nameOf(target)} ${def.applied}.`, 'status');
   emit({ type: 'status', side: sideOf(target), id, op: 'add' });
   return true;
 }
@@ -128,9 +161,9 @@ function removeStatus(target, id) {
 
 /* End of the owner's turn: each burn stack ticks as its own step, then durations count down. */
 function tickSteps(c) {
-  const steps = c.statuses.filter((x) => x.id === 'burn').map(() => [T.tick, () => {
-    const r = dealDamage(c, RULES.burn.dmg, 'burn');
-    log(`Burn scorches ${nameOf(c)} for ${hitText(r)}.`, 'status');
+  const steps = c.statuses.filter((x) => STATUSES[x.id].dot).map((x) => [T.tick, () => {
+    const r = dealDamage(c, RULES[x.id].dmg, x.id);
+    log(`${STATUSES[x.id].name} ${x.id === 'burn' ? 'scorches' : 'hurts'} ${nameOf(c)} for ${hitText(r)}.`, 'status');
     checkEnd();
   }]);
   steps.push([steps.length ? T.short : 0, () => {
@@ -149,7 +182,7 @@ function tickSteps(c) {
 function checkEnd() {
   if (G.over) return true;
   if (G.enemy.hp <= 0) { G.over = 'won'; G.phase = 'over'; log(`${G.enemy.def.name} is defeated. Victory!`, 'win'); }
-  else if (G.player.hp <= 0) { G.over = 'lost'; G.phase = 'over'; log('You have fallen. Defeat.', 'lose'); }
+  else if (PLAYER.hp <= 0) { G.over = 'lost'; G.phase = 'over'; log('You have fallen. Defeat.', 'lose'); }
   else return false;
   emit({ type: 'end', result: G.over });
   render();
@@ -158,21 +191,18 @@ function checkEnd() {
 
 /* ---- battle lifecycle ------------------------------------------------------ */
 
+/* Starts a fight with the persistent PLAYER. Stamina refills; block and statuses reset; HP, mana and gear carry over. */
 function newBattle(enemyId = 'grubnik') {
   const def = ENEMIES[enemyId];
   if (!def) throw new Error(`Unknown enemy "${enemyId}"`);
-  const p = RULES.player;
+  if (!PLAYER) PLAYER = newPlayer();
   const god = G ? G.god : false;
+  PLAYER.stamina = PLAYER.maxStamina;
+  PLAYER.block = 0;
+  PLAYER.statuses = [];
   G = {
-    id: ++battleSeq, enemyId, turn: 1, phase: 'player', over: null, busy: false, god, log: [],
-    player: {
-      name: p.name, level: p.level, hp: p.maxHp, maxHp: p.maxHp, mana: p.maxMana, maxMana: p.maxMana,
-      stamina: p.maxStamina, maxStamina: p.maxStamina, block: 0, statuses: [],
-      equipment: { ...DEFAULT_EQUIPMENT },
-      backpack: [...DEFAULT_BACKPACK],
-      quickbar: [...DEFAULT_QUICKBAR],
-      items: Object.fromEntries(Object.entries(CONSUMABLES).map(([k, v]) => [k, v.count])),
-    },
+    id: ++battleSeq, enemyId, turn: 1, phase: 'player', over: null, busy: false, god,
+    player: PLAYER,
     enemy: { def, hp: def.maxHp, maxHp: def.maxHp, block: 0, statuses: [], intent: null, history: [], followup: null },
   };
   log(`${def.name} (Lv ${def.level}) bars your way.`, 'sys');
@@ -192,14 +222,15 @@ function startPlayerTurn() {
   G.turn++;
   p.block = 0;
   p.mana = Math.min(p.maxMana, p.mana + RULES.player.manaRegen);
-  p.stamina = Math.min(p.maxStamina, p.stamina + RULES.player.staminaRegen);
+  const regen = RULES.player.staminaRegen * (hasStatus(p, 'slowed') ? RULES.slowed.regenMult : 1);
+  p.stamina = Math.min(p.maxStamina, p.stamina + Math.round(regen));
   G.phase = 'player';
   log(`Turn ${G.turn}`, 'turn');
   emit({ type: 'turn', side: 'player' });
 }
 
 function endTurn() {
-  if (G.phase !== 'player' || G.over || G.busy) return;
+  if (!G || G.phase !== 'player' || G.over || G.busy) return;
   const p = G.player;
   G.phase = 'enemy';
   const steps = [];
@@ -207,7 +238,7 @@ function endTurn() {
     steps.push([T.short, () => {
       if (p.mana >= RULES.lightning.upkeep) {
         p.mana -= RULES.lightning.upkeep;
-        const r = dealDamage(G.enemy, RULES.lightning.dmg + equipBonus('spellDamage'), 'lightning');
+        const r = dealDamage(G.enemy, (RULES.lightning.dmg + equipBonus('spellDamage')) * outMult(p), 'lightning');
         log(`Lightning lashes ${G.enemy.def.name} for ${hitText(r)}.`, 'player');
         checkEnd();
       } else {
@@ -224,20 +255,28 @@ function endTurn() {
 function moveSteps(move) {
   const e = G.enemy, p = G.player;
   const steps = [[0, () => { log(`${e.def.name} uses ${move.name}.`, 'enemy'); e.history.push(move.id); }]];
+  if (move.heal) {
+    steps.push([T.short, () => { act('enemy', 'guard'); const n = heal(e, move.heal); log(`${e.def.name} heals ${n}.`, 'enemy'); }]);
+  }
   if (move.block) {
     steps.push([T.short, () => { act('enemy', 'guard'); gainBlock(e, move.block); log(`${e.def.name} gains ${move.block} block.`, 'enemy'); }]);
   }
+  if (move.cast && !move.dmg) steps.push([T.short, () => act('enemy', 'cast', move.cast)]);
   if (move.dmg) {
     const kind = move.kind || 'light';
     for (let i = 0; i < move.hits; i++) {
-      steps.push([i ? T.hitGap : T.short, () => act('enemy', move.cast ? 'cast' : kind === 'heavy' ? 'heavy' : 'melee', move.cast ? 'chill' : undefined)]);
+      steps.push([i ? T.hitGap : T.short, () => act('enemy', move.cast ? 'cast' : kind === 'heavy' ? 'heavy' : 'melee', move.cast || undefined)]);
       steps.push([move.cast ? T.spell : T.impact, () => {
-        const r = dealDamage(p, move.dmg * outMult(e), kind);
+        const bonus = hasStatus(e, 'enraged') ? RULES.enraged.bonus : 0;
+        const r = dealDamage(p, (move.dmg + bonus) * outMult(e), kind);
         log(`${move.hits > 1 ? `Hit ${i + 1}: y` : 'Y'}ou take ${hitText(r)}.`, 'hurt');
         checkEnd();
       }]);
     }
+    steps.push([0, () => { if (removeStatus(e, 'enraged')) log(`${e.def.name} calms down.`, 'status'); }]);
   }
+  if (move.applies) steps.push([move.dmg ? 0 : T.spell, () => addStatus(p, move.applies)]);
+  if (move.selfApplies) steps.push([T.short, () => addStatus(e, move.selfApplies)]);
   if (move.drain) {
     steps.push([T.short, () => {
       const lost = Math.min(p.mana, move.drain);
@@ -273,6 +312,7 @@ function enemyTurn() {
 
 function canUse(id) {
   const a = ACTIONS[id];
+  if (!G) return { ok: false, reason: 'Only usable in a fight.' };
   if (G.over) return { ok: false, reason: 'The fight is over.' };
   if (G.phase !== 'player') return { ok: false, reason: 'It is not your turn.' };
   if (id === 'lightning' && hasStatus(G.player, 'lightning')) return { ok: true };
@@ -282,18 +322,28 @@ function canUse(id) {
   return { ok: true };
 }
 
+/* Thorns on the enemy bite back after each of your melee hits. */
+function thornsBack() {
+  if (G.enemy.hp <= 0 || !hasStatus(G.enemy, 'thorns')) return;
+  const r = dealDamage(PLAYER, RULES.thorns.dmg, 'thorns');
+  log(`Thorns prick you for ${hitText(r)}.`, 'hurt');
+  checkEnd();
+}
+
 function actionSteps(id) {
   const p = G.player, e = G.enemy, b = bonuses();
   switch (id) {
     case 'attack': return [[0, () => act('player', 'melee')], [T.impact, () => {
       const bonus = hasStatus(e, 'staggered') ? RULES.staggered.lightBonus : 0;
-      const r = dealDamage(e, 15 + b.lightDamage + bonus, 'light');
+      const r = dealDamage(e, (15 + b.lightDamage + bonus) * outMult(p), 'light');
       log(`You strike ${e.def.name} for ${hitText(r)}.`, 'player');
+      thornsBack();
     }]];
     case 'heavy': return [[0, () => act('player', 'heavy')], [T.impact, () => {
       const wasStaggered = hasStatus(e, 'staggered');
-      const r = dealDamage(e, 25 + b.heavyDamage + e.def.heavyBonus, 'heavy');
+      const r = dealDamage(e, (25 + b.heavyDamage + e.def.heavyBonus) * outMult(p), 'heavy');
       log(`You smash ${e.def.name} for ${hitText(r)}.`, 'player');
+      thornsBack();
       if (e.hp > 0) {
         addStatus(e, 'staggered', RULES.staggered.turns);
         if (wasStaggered) addStatus(e, 'stunned', RULES.stunned.turns);
@@ -306,12 +356,12 @@ function actionSteps(id) {
       log(`You raise your shield: +${n} block.`, 'player');
     }]];
     case 'fireball': return [[0, () => act('player', 'cast', 'fire')], [T.spell, () => {
-      const r = dealDamage(e, 20 + b.spellDamage, 'fire');
+      const r = dealDamage(e, (20 + b.spellDamage) * outMult(p), 'fire');
       log(`Your fireball hits ${e.def.name} for ${hitText(r)}.`, 'player');
       if (e.hp > 0) addStatus(e, 'burn');
     }]];
     case 'frost': return [[0, () => act('player', 'cast', 'frost')], [T.spell, () => {
-      const r = dealDamage(e, 30 + b.spellDamage, 'frost');
+      const r = dealDamage(e, (30 + b.spellDamage) * outMult(p), 'frost');
       log(`Your frost arrow hits ${e.def.name} for ${hitText(r)}.`, 'player');
       if (e.hp > 0) addStatus(e, 'frozen');
     }]];
@@ -324,7 +374,7 @@ function actionSteps(id) {
 }
 
 function useAction(id) {
-  if (G.busy) return { ok: false, reason: 'busy' };
+  if (!G || G.busy) return { ok: false, reason: 'busy' };
   const check = canUse(id);
   if (!check.ok) return check;
   const a = ACTIONS[id];
@@ -335,6 +385,7 @@ function useAction(id) {
 }
 
 function canUseItem(id) {
+  if (!G) return { ok: false, reason: 'Only usable in a fight.' };
   if (G.over) return { ok: false, reason: 'The fight is over.' };
   if (G.phase !== 'player') return { ok: false, reason: 'It is not your turn.' };
   if (!G.player.items[id]) return { ok: false, reason: 'You have none left.' };
@@ -342,7 +393,7 @@ function canUseItem(id) {
 }
 
 function useItem(id) {
-  if (G.busy) return { ok: false, reason: 'busy' };
+  if (!G || G.busy) return { ok: false, reason: 'busy' };
   const check = canUseItem(id);
   if (!check.ok) return check;
   const it = CONSUMABLES[id], p = G.player;
@@ -364,20 +415,20 @@ function useItem(id) {
 /* ---- equipment & backpack ----------------------------------------------------- */
 
 function canChangeGear() {
-  if (G.phase === 'enemy' || G.busy) return { ok: false, reason: 'Wait for the enemy to finish its turn.' };
+  if (G && !G.over && (G.phase === 'enemy' || G.busy)) return { ok: false, reason: 'Wait for the enemy to finish its turn.' };
   return { ok: true };
 }
 const slotLabel = (slot) => SLOTS.find((s) => s.id === slot).label;
 /* Slot an item goes into by default: its own slot, or the first free ring slot. */
-function targetSlot(itemId) {
+function targetSlot(itemId, p = PLAYER) {
   const it = EQUIPMENT[itemId];
   if (it.slot !== 'ring') return it.slot;
-  return ['ring1', 'ring2'].find((s) => !G.player.equipment[s]) || 'ring1';
+  return ['ring1', 'ring2'].find((s) => !p.equipment[s]) || 'ring1';
 }
 
 /* Equip an item from the backpack (or, for the CLI, conjure one). The replaced item goes to the backpack. */
 function equip(itemId, slot, { conjure = false } = {}) {
-  const p = G.player, it = EQUIPMENT[itemId];
+  const p = PLAYER, it = EQUIPMENT[itemId];
   if (!it) throw new Error(`Unknown item "${itemId}"`);
   slot = slot || targetSlot(itemId);
   if (!SLOTS.some((s) => s.id === slot)) throw new Error(`Unknown slot "${slot}"`);
@@ -388,27 +439,32 @@ function equip(itemId, slot, { conjure = false } = {}) {
   const prev = p.equipment[slot];
   if (prev) p.backpack.push(prev);
   p.equipment[slot] = itemId;
+  recalcPlayer(p);
   log(`You equip ${it.name}${prev ? ` (replacing ${EQUIPMENT[prev].name})` : ''}.`, 'player');
   emit({ type: 'equip', side: 'player', id: itemId });
+  emit({ type: 'player' });
   render();
 }
 function unequip(slot) {
   if (!SLOTS.some((s) => s.id === slot)) throw new Error(`Unknown slot "${slot}"`);
-  const p = G.player, prev = p.equipment[slot];
+  const p = PLAYER, prev = p.equipment[slot];
   if (!prev) return;
   p.equipment[slot] = null;
   p.backpack.push(prev);
+  recalcPlayer(p);
   log(`You stow ${EQUIPMENT[prev].name} in your backpack.`, 'player');
   emit({ type: 'unequip', side: 'player', id: prev });
+  emit({ type: 'player' });
   render();
 }
 /* Pin or unpin a consumable on the action bar. */
 function toggleQuick(id) {
-  const q = G.player.quickbar;
+  const q = PLAYER.quickbar;
   if (!CONSUMABLES[id]) throw new Error(`Unknown item "${id}"`);
   if (q.includes(id)) q.splice(q.indexOf(id), 1);
   else if (q.length >= QUICKBAR_MAX) return { ok: false, reason: `The action bar holds at most ${QUICKBAR_MAX} items.` };
   else q.push(id);
+  emit({ type: 'player' });
   render();
   return { ok: true };
 }
@@ -423,6 +479,9 @@ function describeMove(move, mult = 1) {
   }
   if (move.block) parts.push(`+${move.block} block`);
   if (move.drain) parts.push(`drains ${move.drain} mana`);
+  if (move.heal) parts.push(`heals ${move.heal}`);
+  if (move.applies) parts.push(`inflicts ${STATUSES[move.applies].name}`);
+  if (move.selfApplies) parts.push(`gains ${STATUSES[move.selfApplies].name}`);
   if (move.followup) parts.push('winding up a heavy blow');
   return parts.join(', ');
 }

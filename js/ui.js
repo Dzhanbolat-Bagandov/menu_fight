@@ -48,14 +48,14 @@ function showTip(target) {
 function hideTip() { tooltip.cur = null; tooltip.node.hidden = true; }
 function refreshTipAfterRender() {
   const under = document.elementFromPoint(tooltip.x, tooltip.y);
-  const t = under && under.closest && under.closest('.tile');
+  const t = under && under.closest && under.closest('.tile, .has-tip');
   if (t && t._tip) showTip(t); else hideTip();
 }
 function initTooltips() {
   tooltip.node = $('tooltip');
   document.addEventListener('mousemove', (e) => {
     tooltip.x = e.clientX; tooltip.y = e.clientY;
-    const t = e.target.closest && e.target.closest('.tile');
+    const t = e.target.closest && e.target.closest('.tile, .has-tip');
     if (t && t._tip) { showTip(t); } else if (tooltip.cur) hideTip();
   });
   document.addEventListener('mouseleave', hideTip);
@@ -78,9 +78,9 @@ function itemTip(id, inBackpack) {
   return () => {
     const it = CONSUMABLES[id], c = canUseItem(id);
     const fx = Object.entries(it.effect).map(([r, n]) => `Restores ${n} ${r}`);
-    const pinned = G.player.quickbar.includes(id);
+    const pinned = PLAYER.quickbar.includes(id);
     return {
-      icon: it.icon, tint: it.tint, name: it.name, tag: `Consumable · ${G.player.items[id] || 0} left`, lines: fx, desc: it.desc,
+      icon: it.icon, tint: it.tint, name: it.name, tag: `Consumable · ${PLAYER.items[id] || 0} left`, lines: fx, desc: it.desc,
       hint: inBackpack ? (pinned ? 'Pinned to the action bar. Click to unpin.' : 'Click to pin to the action bar.') : '',
       warn: inBackpack ? '' : c.ok ? '' : c.reason,
     };
@@ -108,7 +108,7 @@ function equipTip(slotId, id) {
     if (!id) { const slot = SLOTS.find((s) => s.id === slotId); return { icon: SLOT_ICONS[slotId], tint: 'steel', name: `${slot.label}: empty`, tag: 'Equipment slot', desc: 'Nothing equipped. Click gear in your backpack to equip it.' }; }
     const it = EQUIPMENT[id];
     if (slotId) return { icon: it.icon, tint: it.tint, name: it.name, tag: `Equipped · ${slotLabel(slotId)}`, lines: bonusLines(it), desc: it.desc, hint: 'Click to move it to your backpack.', warn: gear.ok ? '' : gear.reason };
-    const target = targetSlot(id), prev = G.player.equipment[target];
+    const target = targetSlot(id), prev = PLAYER.equipment[target];
     return { icon: it.icon, tint: it.tint, name: it.name, tag: `Backpack · ${slotLabel(target)}`, lines: bonusLines(it), desc: it.desc, hint: `Click to equip${prev ? ` (replaces ${EQUIPMENT[prev].name})` : ''}.`, warn: gear.ok ? '' : gear.reason };
   };
 }
@@ -151,7 +151,7 @@ function barEntries() {
       return { icon: a.icon, tint: a.tint, disabled: !c.ok, pressed: id === 'lightning' && hasStatus(G.player, 'lightning'), badge: costs, badgeClass: Object.keys(a.cost)[0], tip: actionTip(id), run: () => useAction(id) };
     });
   }
-  return G.player.quickbar.map((id) => {
+  return PLAYER.quickbar.map((id) => {
     const it = CONSUMABLES[id], c = canUseItem(id);
     return { icon: it.icon, tint: it.tint, disabled: !c.ok, count: G.player.items[id] || 0, tip: itemTip(id, false), run: () => useItem(id) };
   });
@@ -250,6 +250,7 @@ function renderCorners() {
 }
 
 function renderAll() {
+  if (!G || !RUN || RUN.view !== 'battle') return;
   const p = G.player, e = G.enemy;
   $('p-name').textContent = p.name; $('p-lv').textContent = `Lv ${p.level}`;
   $('e-name').textContent = e.def.name; $('e-lv').textContent = `Lv ${e.def.level}`;
@@ -262,12 +263,30 @@ function renderAll() {
   renderBlock($('p-block'), p.block); renderBlock($('e-block'), e.block);
   renderStatuses($('p-status'), p); renderStatuses($('e-status'), e);
   renderActions(); renderIntent();
-  const b = $('banner');
-  b.hidden = !G.over;
-  if (G.over) { $('banner-title').textContent = G.over === 'won' ? 'Victory!' : 'Defeat'; $('banner-sub').textContent = G.over === 'won' ? `${e.def.name} lies broken at your feet.` : 'Your journey ends here... for now.'; }
+  renderBanner();
   $('app').classList.toggle('enemy-turn', G.phase === 'enemy');
   renderStageStates();
   refreshTipAfterRender();
+}
+
+function renderBanner() {
+  const b = $('banner'), e = G.enemy;
+  b.hidden = !G.over;
+  if (!G.over) return;
+  const won = G.over === 'won';
+  $('banner-title').textContent = won ? 'Victory!' : 'Defeat';
+  $('banner-sub').textContent = won ? `${e.def.name} lies broken at your feet.` : 'Your journey ends here... for now.';
+  const rw = $('banner-reward');
+  rw.innerHTML = '';
+  const reward = RUN && RUN.node && RUN.node.reward;
+  if (won && reward) {
+    const it = CONSUMABLES[reward];
+    rw.appendChild(iconTile({ icon: it.icon, tint: it.tint, tip: itemTip(reward, true) }));
+    rw.appendChild(el('span', '', `Found: <b>${it.name}</b>`));
+  }
+  const btn = $('banner-btn');
+  btn.textContent = won ? 'Continue to the map' : 'See how it ended';
+  btn.onclick = () => { Sfx.play('click'); if (won) backToMap(); else { G = null; RUN.view = 'gameover'; emit({ type: 'view' }); } };
 }
 
 function renderStageStates() {
@@ -289,7 +308,7 @@ function appendLog(text, cls) {
   box.appendChild(line);
   box.scrollTop = box.scrollHeight;
 }
-function rebuildLog() { $('log').innerHTML = ''; G.log.forEach((l) => appendLog(l.text, l.cls)); }
+function rebuildLog() { $('log').innerHTML = ''; LOG.forEach((l) => appendLog(l.text, l.cls)); }
 
 /* ---- inventory modal: equipment + backpack ------------------------------------------- */
 
@@ -301,7 +320,7 @@ function tryGear(fn) {
   renderInventory();
 }
 function renderInventory() {
-  const card = $('modal-card'), p = G.player;
+  const card = $("modal-card"), p = PLAYER;
   card.innerHTML = '<h3>Equipment &amp; Backpack</h3>';
   const cols = el('div', 'inv-cols');
 
@@ -363,8 +382,9 @@ function initUI() {
   Engine.listeners.push((ev) => {
     switch (ev.type) {
       case 'log': appendLog(ev.text, ev.cls); break;
-      case 'new': rebuildLog(); renderAll(); break;
-      case 'render': renderAll(); if (UI.inventoryOpen) renderInventory(); break;
+      case 'new': renderAll(); break;
+      case 'render': if (RUN && RUN.view === 'battle') renderAll(); else Views.refresh(); if (UI.inventoryOpen) renderInventory(); break;
+      case 'view': Views.show(); if (UI.inventoryOpen) renderInventory(); break;
       default: Fx.handle(ev);
     }
   });
@@ -375,7 +395,6 @@ function initUI() {
   syncSound();
   UI.syncSound = syncSound;
   for (const evt of ['pointerdown', 'keydown']) document.addEventListener(evt, () => Sfx.unlock(), { once: true });
-  $('banner-restart').addEventListener('click', () => newBattle(G.enemyId));
 
   const wrap = $('e-corner'), pop = $('info-pop');
   let pinned = false;
@@ -389,6 +408,7 @@ function initUI() {
     if (e.target.tagName === 'INPUT' || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === 'i' || e.key === 'I') { if ($('modal').hidden) openInventory(); else closeModal(); return; }
     if (!$('modal').hidden) return;
+    if (!G || RUN.view !== 'battle') return;
     if (e.key === 'e' || e.key === 'E') endTurn();
     else if (e.key === 'q' || e.key === 'Q') switchBar();
     const n = parseInt(e.key, 10);
