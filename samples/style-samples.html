@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Style Samples</title>
+<style>
+  :root { --parch: #f2ead8; --dim: #b9ad92; --bronze: #c8913a; --bronze-hi: #e8b768; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 28px; font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif; color: var(--parch);
+    background: repeating-linear-gradient(90deg, #1d1209 0 3px, transparent 3px 132px), repeating-linear-gradient(90deg, #4a3220 0 132px, #3f2a1a 132px 264px, #52391f 264px 396px); }
+  h1 { margin: 0 0 4px; letter-spacing: .1em; text-shadow: 0 2px 0 #000; }
+  .lead { margin: 0 0 22px; color: var(--dim); font-style: italic; }
+  .style-row { display: grid; grid-template-columns: 250px 1fr 1fr 330px; gap: 18px; align-items: center; margin-bottom: 18px; padding: 16px;
+    background: linear-gradient(160deg, #6a6b66, #4d4e4a); border: 4px solid #2c2f33; border-radius: 8px; box-shadow: inset 0 0 0 2px #7a5218, inset 0 0 40px rgba(0,0,0,.5), 0 10px 20px rgba(0,0,0,.6); }
+  .label h2 { margin: 0; font-size: 30px; color: var(--bronze-hi); text-shadow: 0 2px 0 #000; }
+  .label h3 { margin: 2px 0 8px; font-size: 18px; letter-spacing: .06em; }
+  .label p { margin: 0; font-size: 14px; color: #ddd3bc; line-height: 1.35; }
+  .stage { height: 340px; display: flex; align-items: flex-end; justify-content: center; border: 3px solid #2c2f33; border-radius: 4px;
+    background: radial-gradient(ellipse at 50% 90%, rgba(255,200,120,.17), transparent 65%), linear-gradient(#262420, #1a1815); box-shadow: inset 0 0 30px #000; }
+  .stage svg { height: 100%; width: auto; }
+  .icons { display: flex; gap: 18px; justify-content: center; }
+  .tile { width: 92px; height: 92px; padding: 8px; display: grid; place-items: center; border-radius: 8px; border: 3px solid #55595e;
+    background: radial-gradient(circle at 30% 25%, var(--t1), var(--t2) 85%); box-shadow: inset 0 0 0 1px #7a5218, inset 0 -6px 10px rgba(0,0,0,.4), 0 3px 4px rgba(0,0,0,.6); }
+  .tile svg { width: 100%; height: 100%; }
+  .t-steel { --t1: #8a98a3; --t2: #3b434a; } .t-fire { --t1: #c0602a; --t2: #4d1a0e; } .t-blood { --t1: #b0463a; --t2: #3f1410; }
+  .small { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+  .small .tile { width: 52px; height: 52px; padding: 4px; border-width: 2px; }
+  .cap { text-align: center; font-size: 12px; color: var(--dim); margin-top: 6px; letter-spacing: .08em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<h1>Visual overhaul: style samples</h1>
+<p class="lead">Same characters and icons drawn four ways. Icons are shown at bar size (92px) and at small status size (52px).</p>
+<div id="rows"></div>
+
+<script>
+'use strict';
+/* ---------- colour helpers ---------- */
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const toHex = (c) => '#' + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+const mix = (a, b, t) => toHex(hex(a).map((v, i) => v + (hex(b)[i] - v) * t));
+const lighten = (c, t) => mix(c, '#ffffff', t);
+const darken = (c, t) => mix(c, '#000000', t);
+const desat = (c, t) => { const [r, g, b] = hex(c); const l = 0.3 * r + 0.59 * g + 0.11 * b; return toHex([r, g, b].map((v) => v + (l - v) * t)); };
+
+/* ---------- shared geometry ----------
+   part: { d, c, tf?, a? (alpha), flat? (no shading), line? (stroke-only detail, w) , ink? (detail drawn in ink colour) } */
+const STEEL = '#c3ccd3', STEEL_D = '#8e99a2', BRONZE = '#d6a24a', RED = '#a82e26', SKIN = '#e2b48c', LEATHER = '#5a3a1e';
+const circ = (cx, cy, rx, ry = rx) => `M${cx - rx} ${cy} a${rx} ${ry} 0 1 0 ${rx * 2} 0 a${rx} ${ry} 0 1 0 ${-rx * 2} 0Z`;
+
+const KNIGHT = { vb: '0 0 240 340', ground: [120, 324, 82, 10], parts: [
+  { d: 'M86 100 C62 150 54 240 62 316 L180 316 C188 240 180 150 156 100 Z', c: '#6e1f1b' },
+  { d: 'M92 206 L118 206 L117 298 L95 298 Z', c: STEEL }, { d: 'M124 206 L150 206 L147 298 L125 298 Z', c: STEEL },
+  { d: circ(106, 234, 10), c: BRONZE }, { d: circ(136, 234, 10), c: BRONZE },
+  { d: 'M84 296 L119 296 L121 314 L80 314 Q80 302 84 296 Z', c: '#5d6a74' }, { d: 'M124 296 L158 296 Q164 305 162 314 L123 314 Z', c: '#5d6a74' },
+  { d: 'M86 184 L154 184 L162 238 L134 242 L120 228 L106 242 L78 238 Z', c: RED },
+  { d: 'M80 102 Q120 86 160 102 L155 192 L85 192 Z', c: STEEL },
+  { d: 'M98 108 L142 108 L139 190 L101 190 Z', c: RED },
+  { d: 'M115 116 L125 116 L125 176 L115 176 Z', c: BRONZE, flat: 1 }, { d: 'M104 132 L136 132 L136 141 L104 141 Z', c: BRONZE, flat: 1 },
+  { d: 'M84 180 L156 180 L156 192 L84 192 Z', c: LEATHER }, { d: 'M112 177 L128 177 L128 195 L112 195 Z', c: BRONZE },
+  { d: 'M150 110 L172 118 L178 168 L158 172 Z', c: STEEL },
+  { d: 'M170 46 L176 28 L182 46 L182 160 L170 160 Z', c: '#e8edf0', tf: 'rotate(22 176 176)' },
+  { d: 'M176 40 L176 156', line: 1, w: 2, c: '#9aa6af', tf: 'rotate(22 176 176)' },
+  { d: 'M154 158 L198 158 L198 167 L154 167 Z', c: BRONZE, tf: 'rotate(22 176 176)' },
+  { d: 'M172 167 L180 167 L180 190 L172 190 Z', c: '#4a2e18', tf: 'rotate(22 176 176)' },
+  { d: circ(176, 196, 6), c: BRONZE, tf: 'rotate(22 176 176)' },
+  { d: circ(176, 170, 12, 11), c: STEEL_D },
+  { d: 'M180 112 Q178 90 154 92 Q138 96 140 120 Q162 128 180 112 Z', c: STEEL },
+  { d: 'M60 116 L82 112 L84 160 L64 164 Z', c: STEEL },
+  { d: 'M24 118 L98 118 L98 182 Q98 228 61 252 Q24 228 24 182 Z', c: '#2f4f86' },
+  { d: 'M32 126 L90 126 L90 182 Q90 222 61 242 Q32 222 32 182 Z', line: 1, w: 5, c: BRONZE },
+  { d: 'M36 170 L61 150 L86 170 L86 184 L61 164 L36 184 Z', c: '#dfe4e8' },
+  { d: 'M60 112 Q62 90 86 92 Q102 96 100 120 Q78 128 60 112 Z', c: STEEL },
+  { d: 'M102 84 L138 84 L140 104 L100 104 Z', c: STEEL_D },
+  { d: circ(120, 66, 20, 23), c: SKIN },
+  { d: 'M94 72 C92 34 104 20 120 20 C136 20 148 34 146 72 L140 78 L140 54 L100 54 L100 78 Z', c: '#cfd7dd' },
+  { d: 'M96 46 Q120 34 144 46 L145 56 L95 56 Z', c: STEEL_D },
+  { d: 'M92 60 L102 60 L102 90 Q96 90 92 84 Z', c: STEEL }, { d: 'M148 60 L138 60 L138 90 Q144 90 148 84 Z', c: STEEL },
+  { d: 'M120 22 C108 0 142 -6 158 12 C146 10 136 16 130 28 Z', c: '#b0302a' },
+  { d: circ(112, 68, 2.6), c: '#1d1712', flat: 1, noline: 1 }, { d: circ(128, 68, 2.6), c: '#1d1712', flat: 1, noline: 1 },
+  { d: 'M106 61 q6 -3 11 0 M123 61 q6 -3 11 0 M120 70 l-2 8 l3 1 M113 83 q7 4 14 0', line: 1, w: 2.2, ink: 1 },
+] };
+
+const GOBLIN = { vb: '0 0 240 340', ground: [118, 322, 76, 9], parts: [
+  { d: 'M128 250 L146 250 L150 300 L132 300 Z', c: '#6f9446' }, { d: 'M130 298 L156 298 Q164 306 160 314 L128 314 Z', c: '#6f9446' },
+  { d: 'M156 176 L180 214 L168 222 L146 190 Z', c: '#7fa650' }, { d: circ(172, 220, 9), c: '#7fa650' },
+  { d: 'M78 168 Q120 150 162 170 L170 256 Q120 266 70 256 Z', c: '#6b4a2b' },
+  { d: 'M92 216 L116 212 L118 236 L94 240 Z', c: '#8f6e44' },
+  { d: 'M95 219 L114 216 M96 236 L115 233', line: 1, w: 1.6, c: '#3a2414' },
+  { d: 'M98 250 L116 250 L112 300 L94 300 Z', c: '#7fa650' }, { d: 'M86 298 L116 298 L118 314 L72 314 Q74 302 86 298 Z', c: '#7fa650' },
+  { d: 'M74 312 l-4 -6 M84 312 l-3 -7', line: 1, w: 2, ink: 1 },
+  { d: 'M72 218 Q120 228 168 218 L169 230 Q120 240 71 230 Z', c: '#3a2414' },
+  { d: 'M140 228 L158 226 L160 248 L142 250 Z', c: '#5a3a1e' }, { d: 'M112 222 L126 222 L126 236 L112 236 Z', c: BRONZE },
+  { d: 'M84 158 Q120 174 158 158 L160 176 Q120 192 82 176 Z', c: '#8e2e28' }, { d: 'M148 168 L178 198 L164 204 L144 180 Z', c: '#8e2e28' },
+  { d: 'M84 176 L46 196 L52 210 L92 194 Z', c: '#7fa650' },
+  { d: 'M40 196 L14 142 L22 138 L48 190 Z', c: '#b9c0c4' }, { d: 'M24 160 l3 6 M30 172 l2 4', line: 1, w: 3, c: '#8a5a30' },
+  { d: 'M28 198 L50 186 L54 193 L32 205 Z', c: '#5a3a1e' },
+  { d: circ(44, 202, 11), c: '#7fa650' },
+  { d: 'M86 112 L20 84 L74 142 Z', c: '#8cb35c' }, { d: 'M154 112 L216 86 L164 142 Z', c: '#8cb35c' },
+  { d: 'M78 116 L42 96 L70 132 Z', c: '#d89a8a', flat: 1, noline: 1 }, { d: 'M162 116 L194 100 L168 132 Z', c: '#d89a8a', flat: 1, noline: 1 },
+  { d: 'M120 76 C88 76 76 100 78 124 C80 150 98 166 120 166 C142 166 160 150 162 124 C164 100 152 76 120 76 Z', c: '#8cb35c' },
+  { d: circ(104, 118, 11, 10), c: '#f4e27a', flat: 1 }, { d: circ(138, 118, 10, 9), c: '#f4e27a', flat: 1 },
+  { d: circ(101, 119, 3, 7.5), c: '#1d1712', flat: 1, noline: 1 }, { d: circ(135, 119, 2.8, 7), c: '#1d1712', flat: 1, noline: 1 },
+  { d: 'M120 116 L100 140 L124 142 Z', c: '#79a04a' },
+  { d: 'M98 150 Q120 162 144 150', line: 1, w: 3, ink: 1 },
+  { d: 'M104 152 l3 9 l3 -7 M130 153 l3 8 l3 -9', c: '#f2ead8', flat: 1 },
+  { d: 'M82 100 L92 50 L148 50 L158 100 Q120 110 82 100 Z', c: '#7d858b' },
+  { d: circ(120, 50, 28, 7), c: '#a9b1b6' },
+  { d: 'M108 62 l8 10 l-5 12 M130 58 q10 4 12 16', line: 1, w: 2.4, c: '#4a5258' },
+  { d: circ(92, 88, 2.6), c: '#2c3236', flat: 1, noline: 1 }, { d: circ(148, 88, 2.6), c: '#2c3236', flat: 1, noline: 1 },
+] };
+
+const ICON_SWORD = { vb: '0 0 64 64', parts: [
+  { d: 'M29 8 L32 2 L35 8 L35 42 L29 42 Z', c: '#e8edf0', tf: 'rotate(45 32 32)' },
+  { d: 'M32 6 L32 40', line: 1, w: 1, c: '#9aa6af', tf: 'rotate(45 32 32)' },
+  { d: 'M19 41 L45 41 L45 46 L19 46 Z', c: BRONZE, tf: 'rotate(45 32 32)' },
+  { d: 'M29.5 46 L34.5 46 L34.5 57 L29.5 57 Z', c: '#4a2e18', tf: 'rotate(45 32 32)' },
+  { d: circ(32, 60, 3.5), c: BRONZE, tf: 'rotate(45 32 32)' },
+] };
+const ICON_FIRE = { vb: '0 0 64 64', parts: [
+  { d: 'M40 4 C37 15 51 20 53 33 C55 48 44 60 30 60 C15 60 7 49 10 36 C12 26 20 22 22 13 C26 19 28 21 30 17 C32 13 36 9 40 4 Z', c: '#e0561a' },
+  { d: 'M34 22 C34 31 45 35 43 44 C42 52 35 56 30 56 C22 56 17 49 19 42 C21 36 28 33 34 22 Z', c: '#f4a23a' },
+  { d: 'M30 36 C30 43 37 46 35 51 C33 54 26 54 25 50 C24 45 28 42 30 36 Z', c: '#ffe7a0', flat: 1 },
+] };
+const ICON_POTION = { vb: '0 0 64 64', parts: [
+  { d: 'M26 7 L38 7 L38 11 L36 11 L36 23 C46 27 52 34 52 42 C52 52 43 60 32 60 C21 60 12 52 12 42 C12 34 18 27 28 23 L28 11 L26 11 Z', c: '#cfe3ea', a: 0.45 },
+  { d: 'M13 40 C19 36 26 42 32 38 C38 35 45 41 51 38 C52 40 52 41 52 42 C52 52 43 60 32 60 C21 60 12 52 12 42 Z', c: '#c4302a' },
+  { d: 'M26 7 L38 7 L38 11 L36 11 L36 23 C46 27 52 34 52 42 C52 52 43 60 32 60 C21 60 12 52 12 42 C12 34 18 27 28 23 L28 11 L26 11 Z', line: 1, w: 0, c: '#000' },
+  { d: 'M27 2 L37 2 L37 9 L27 9 Z', c: '#a8743c' },
+  { d: 'M19 36 C19 31 22 28 26 27', line: 1, w: 2.5, c: '#ffffff' },
+  { d: circ(24, 48, 2.2), c: '#ff8a7a', flat: 1, noline: 1 }, { d: circ(38, 52, 1.5), c: '#ff8a7a', flat: 1, noline: 1 },
+] };
+
+/* ---------- renderers ---------- */
+let uid = 0;
+const INK = '#1d140e';
+
+function render(geo, style, big) {
+  const id = 's' + (++uid);
+  const sc = big ? 1 : 0.32; // scale effects for small viewBoxes
+  let defs = '', body = '';
+  if (geo.ground) { const [cx, cy, rx, ry] = geo.ground; body += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="rgba(0,0,0,.45)"/>`; }
+
+  if (style === 'ink') {
+    defs += `<filter id="${id}c" x="-20%" y="-20%" width="140%" height="140%"><feOffset in="SourceAlpha" dx="${-7 * sc}" dy="${-6 * sc}" result="o"/><feComposite in="SourceAlpha" in2="o" operator="out" result="rim"/><feFlood flood-color="#1a0c06" flood-opacity=".42"/><feComposite in2="rim" operator="in" result="sh"/><feOffset in="SourceAlpha" dx="${3 * sc}" dy="${3 * sc}" result="o2"/><feComposite in="SourceAlpha" in2="o2" operator="out" result="rim2"/><feFlood flood-color="#fff" flood-opacity=".32"/><feComposite in2="rim2" operator="in" result="hl"/><feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="sh"/><feMergeNode in="hl"/></feMerge></filter>`;
+  }
+  if (style === 'paint') {
+    defs += `<filter id="${id}c" x="-20%" y="-20%" width="140%" height="140%"><feOffset in="SourceAlpha" dx="${-8 * sc}" dy="${-8 * sc}" result="o"/><feGaussianBlur in="o" stdDeviation="${5 * sc}" result="ob"/><feComposite in="SourceAlpha" in2="ob" operator="out" result="rim"/><feFlood flood-color="#120a06" flood-opacity=".55"/><feComposite in2="rim" operator="in" result="sh"/><feOffset in="SourceAlpha" dx="${4 * sc}" dy="${4 * sc}" result="o2"/><feGaussianBlur in="o2" stdDeviation="${2.5 * sc}" result="ob2"/><feComposite in="SourceAlpha" in2="ob2" operator="out" result="rim2"/><feFlood flood-color="#fff6e0" flood-opacity=".45"/><feComposite in2="rim2" operator="in" result="hl"/><feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="sh"/><feMergeNode in="hl"/></feMerge></filter>`;
+    defs += `<filter id="${id}g" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="${3 * sc}" stdDeviation="${4 * sc}" flood-color="#000" flood-opacity=".55"/></filter>`;
+  }
+  if (style === 'wood') {
+    defs += `<pattern id="${id}h" patternUnits="userSpaceOnUse" width="${5 * sc + 1.5}" height="${5 * sc + 1.5}" patternTransform="rotate(40)"><line x1="0" y1="0" x2="0" y2="${5 * sc + 1.5}" stroke="#1a120a" stroke-width="${1.7 * sc + 0.4}"/></pattern>`;
+  }
+
+  let n = 0;
+  for (const p of geo.parts) {
+    const tf = p.tf ? ` transform="${p.tf}"` : '';
+    const pid = `${id}p${n++}`;
+    if (p.line) {
+      if (!p.w) continue;
+      const col = p.ink ? (style === 'paint' ? '#3a1e10' : INK) : style === 'wood' ? INK : p.c;
+      const w = p.w * (style === 'wood' && !p.ink ? 0.8 : 1);
+      body += `<path d="${p.d}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"${tf}/>`;
+      continue;
+    }
+    const alpha = p.a ? ` fill-opacity="${p.a}"` : '';
+    if (style === 'ink') {
+      body += `<path d="${p.d}" fill="${p.c}"${alpha}${p.flat ? '' : ` filter="url(#${id}c)"`}${tf}/>`;
+      if (!p.noline) body += `<path d="${p.d}" fill="none" stroke="${INK}" stroke-width="${big ? 3.4 : 1.6}" stroke-linejoin="round"${tf}/>`;
+    } else if (style === 'paint') {
+      defs += `<linearGradient id="${pid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${lighten(p.c, 0.22)}"/><stop offset=".55" stop-color="${p.c}"/><stop offset="1" stop-color="${darken(p.c, 0.28)}"/></linearGradient>`;
+      body += `<path d="${p.d}" fill="url(#${pid})"${alpha}${p.flat ? '' : ` filter="url(#${id}c)"`}${tf}/>`;
+      if (!p.noline) body += `<path d="${p.d}" fill="none" stroke="${darken(p.c, 0.55)}" stroke-opacity=".8" stroke-width="${big ? 1.4 : 0.7}" stroke-linejoin="round"${tf}/>`;
+    } else if (style === 'wood') {
+      const col = mix(desat(p.c, 0.35), '#e6d6b0', 0.22);
+      body += `<path d="${p.d}" fill="${col}"${alpha}${tf}/>`;
+      if (!p.flat) {
+        const off = big ? 10 : 3.2;
+        defs += `<mask id="${pid}" maskUnits="userSpaceOnUse" x="-50" y="-50" width="400" height="500"><path d="${p.d}" fill="#fff"${tf}/><g${tf}><path d="${p.d}" fill="#000" transform="translate(${-off} ${-off})"/></g></mask>`;
+        body += `<path d="${p.d}" fill="url(#${id}h)" mask="url(#${pid})"${tf}/>`;
+      }
+      if (!p.noline) body += `<path d="${p.d}" fill="none" stroke="${INK}" stroke-width="${big ? 2.8 : 1.4}" stroke-linejoin="round"${tf}/>`;
+    }
+  }
+  const wrap = style === 'paint' ? `<g filter="url(#${id}g)">${body}</g>` : body;
+  return `<svg viewBox="${geo.vb}" xmlns="http://www.w3.org/2000/svg"><defs>${defs}</defs>${wrap}</svg>`;
+}
+
+/* ---------- pixel art ---------- */
+const PAL = {
+  k: '#1d1712', s: '#eef2f4', S: '#aab4bc', d: '#6c7680', r: '#c0392b', R: '#7a2420', f: '#eebc92', F: '#c48a64', e: '#1d1712',
+  b: '#e8b850', B: '#9a6a20', u: '#4a72b0', U: '#2a4478', w: '#8a5a2c', W: '#4a2e18', g: '#9cc464', G: '#5f8a3a', y: '#f4e27a',
+  p: '#e0a090', o: '#f08a2c', O: '#c4452f', Y: '#ffe7a0', c: '#cfe3ea', C: '#8fb0bc', n: '#7a5634', N: '#4a3220', m: '#8d959b', M: '#555d63', t: '#f2ead8',
+};
+function pixel(rows, scale = 1) {
+  const h = rows.length, w = Math.max(...rows.map((r) => r.length));
+  let out = '';
+  rows.forEach((row, y) => {
+    let x = 0;
+    while (x < row.length) {
+      const ch = row[x];
+      let run = 1;
+      while (x + run < row.length && row[x + run] === ch) run++;
+      if (ch !== '.' && PAL[ch]) out += `<rect x="${x}" y="${y}" width="${run}" height="1" fill="${PAL[ch]}"/>`;
+      x += run;
+    }
+  });
+  return `<svg viewBox="-1 -1 ${w + 2} ${h + 2}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">${out}</svg>`;
+}
+const PX_KNIGHT = [
+  '............RR..........s.',
+  '...........RrrR........sS.',
+  '..........kkrRkk.......sS.',
+  '.........kSsssSSk......sS.',
+  '........kSsSSSSdSk.....sS.',
+  '........kdddddddddk....sS.',
+  '........kSfffffffSk....sS.',
+  '........kSfefffefSk....sS.',
+  '........kSffffFffSk....sS.',
+  '........kdffFkkFfdk....sS.',
+  '.........kdffffffk.....sS.',
+  '..........kddddddk.....sS.',
+  '.....kkkSSkrrrrrrkSSkkkbbbb',
+  '....kSSsSSkrrbbrrkSsSSkkSk.',
+  '....kSsSSdkrrbbrrkdSSsSkSk.',
+  '..kkkkkkkkkrbbbbrkdSSSkSSSk',
+  '.kUuuuuuuUkrrbbrrkkdSSkSSSk',
+  '.kUuubuuuUkrrbbrrk.kdSkkWk.',
+  '.kUubbbuuUkrrbbrrk..kdk.Wk.',
+  '.kUuubuuuUkrrbbrrk..kdk.bk.',
+  '.kUuubuuuUkWWbbWWk..kSk....',
+  '.kUuuuuuuUkrrrrrrk..kkk....',
+  '..kUuuuuUkrrrrrrrrk........',
+  '..kUuuuuUkrrRrrRrrk........',
+  '...kUuuUk.krrk.krrk........',
+  '....kUUk..kSSk.kSSk........',
+  '.....kk...kSsk.kSsk........',
+  '..........kbbk.kbbk........',
+  '..........kSSk.kSSk........',
+  '..........kSdk.kSdk........',
+  '.........kddddkddddk.......',
+  '.........kkkkkkkkkkk.......',
+];
+const PX_GOBLIN = [
+  '.........kkkkkk..........',
+  '........kMmmmmmk.........',
+  '........kmmmmmMk.........',
+  '.......kmmMmmmmMk........',
+  '.k....kmmmmmmmmmMk....k..',
+  '.kgk..kkkkkkkkkkkk...kgk.',
+  '..kgpk.kggggggggk...kpgk.',
+  '...kgpkgggggggggggkkpgk..',
+  '....kgktykggggtykgkggk...',
+  '.....kgykkggggkykgggk....',
+  '......kgggGgggggggk......',
+  '......kggGGggggggk.......',
+  '.......kgkttkttkgk.......',
+  '........kGggggggk........',
+  '....s..kRRRRRRRRRk.......',
+  '...sS.kkRRRRRRRRRRk......',
+  '..sS..kgknnnnnnnnkgk.....',
+  '.sS..kgk.nnnnnnnnkkgk....',
+  'kWk.kgk.knnNnnnnnk.kgk...',
+  'kgggggk.knnNNnnnnk..kgk..',
+  '.kgggk..kNNNbbNNNk..kgk..',
+  '........knnnnnnnnk...k...',
+  '........knnnnnnnnk.......',
+  '........kkkkkkkkkk.......',
+  '.........kgk..kgk........',
+  '.........kgk..kgk........',
+  '.........kgk..kgk........',
+  '.......kkggk..kggkk......',
+  '.......kgggk..kgggk......',
+  '.......kkkkk..kkkkk......',
+];
+const PX_SWORD = [
+  '.............kk.',
+  '............ksk.',
+  '...........kssk.',
+  '..........kssk..',
+  '.........kssk...',
+  '........kssk....',
+  '.......kssk.....',
+  '..kk..kssk......',
+  '..kbkkssk.......',
+  '...kbssk........',
+  '....kbk.........',
+  '...kWkbk........',
+  '..kWk.kbk.......',
+  '.kbk...kk.......',
+  '.kk.............',
+  '................',
+];
+const PX_FIRE = [
+  '.........k......',
+  '........kok.....',
+  '...k....kook....',
+  '..kok..koOok....',
+  '..kook.kooOok...',
+  '.kooOkkooooOk...',
+  '.koooookooooOk..',
+  '.kooooooYYooOk..',
+  'kooooYYYYYooOOk.',
+  'koooYYyyYYYoOOk.',
+  'kooYYyyyyYYoOOk.',
+  'kooYYyyyyyYoOk..',
+  '.kooYYyyyYooOk..',
+  '.kOooYYYYooOk...',
+  '..kkOOooOOkk....',
+  '....kkkkkk......',
+];
+const PX_POTION = [
+  '.....kkkkkk.....',
+  '.....kwwwwk.....',
+  '.....kkkkkk.....',
+  '......kcCk......',
+  '......kcCk......',
+  '.....kcccCk.....',
+  '....kccccCCk....',
+  '...kcccccccCk...',
+  '..kctcccccccCk..',
+  '..kcrrrrrrrrrk..',
+  '..krrrrrrrrRrk..',
+  '..krtrrrrrrRRk..',
+  '..krrrrrrrrRRk..',
+  '...krrrrrrRRk...',
+  '....kkRRRRkk....',
+  '......kkkk......',
+];
+
+/* ---------- page ---------- */
+const STYLES = [
+  { key: 'ink', name: 'A · Storybook Ink', sub: 'Bold outlines, cel shading', desc: 'Thick dark outlines and flat colour with a crisp shadow band and rim highlight on every shape. Reads very clearly at small sizes. Closest to Slay the Spire / Darkest Dungeon light.' },
+  { key: 'paint', name: 'B · Soft Painted', sub: 'Gradients, soft light', desc: 'No hard outline. Each shape has a lit-to-shadow gradient, a blurred core shadow and a warm rim light. Looks richer and "rendered", a bit less crisp when tiny.' },
+  { key: 'wood', name: 'C · Woodcut', sub: 'Engraved, hatched shadows', desc: 'Muted, parchment-tinted palette with ink outlines and hatched shadows, like a medieval print. Very on-theme, and pairs well with the parchment map.' },
+  { key: 'pixel', name: 'D · Pixel Art', sub: 'Chunky retro pixels', desc: 'Hand-placed pixels with a dark outline, scaled up crisply. Matches a cobblestone / blocky background. Scales perfectly at whole-number zoom.' },
+];
+const rowsEl = document.getElementById('rows');
+for (const st of STYLES) {
+  const knight = st.key === 'pixel' ? pixel(PX_KNIGHT) : render(KNIGHT, st.key, true);
+  const goblin = st.key === 'pixel' ? pixel(PX_GOBLIN) : render(GOBLIN, st.key, true);
+  const icons = st.key === 'pixel' ? [pixel(PX_SWORD), pixel(PX_FIRE), pixel(PX_POTION)] : [ICON_SWORD, ICON_FIRE, ICON_POTION].map((g) => render(g, st.key, false));
+  const tints = ['t-steel', 't-fire', 't-blood'];
+  const tiles = (cls) => icons.map((s, i) => `<div class="tile ${tints[i]}">${s}</div>`).join('');
+  rowsEl.insertAdjacentHTML('beforeend', `<section class="style-row" id="row-${st.key}">
+    <div class="label"><h2>${st.name}</h2><h3>${st.sub}</h3><p>${st.desc}</p></div>
+    <div><div class="stage">${knight}</div><div class="cap">Knight</div></div>
+    <div><div class="stage">${goblin}</div><div class="cap">Grubnik</div></div>
+    <div><div class="icons">${tiles()}</div><div class="small">${tiles()}</div><div class="cap">Attack · Fireball · Healing Draught</div></div>
+  </section>`);
+}
+</script>
+</body>
+</html>
