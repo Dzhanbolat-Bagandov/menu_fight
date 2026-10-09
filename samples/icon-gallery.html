@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Icon Gallery</title>
+<style>body{margin:0;padding:20px;background:#2a1e14;color:#f2ead8;font:13px Georgia,serif}
+#g{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}.c{display:flex;flex-direction:column;align-items:center;gap:4px}
+.fr{width:76px;height:76px;padding:3px;border-radius:8px;background:linear-gradient(145deg,#e8c070,#7a5218 45%,#3a2408 55%,#c8913a)}
+.fr svg,.bare svg{width:100%;height:100%;display:block;border-radius:5px}.bare{width:44px;height:44px;background:#5a4a3a;border-radius:6px}</style></head>
+<body><div id="g"></div><script src="../js/icons.js"></script><script>
+for (const n of Object.keys(ICON_DEFS)) document.getElementById('g').insertAdjacentHTML('beforeend', `<div class="c"><div class="fr">${iconSVG(n)}</div><div class="bare">${iconSVG(n,'',{bare:true})}</div>${n}</div>`);
+</script></body></html>

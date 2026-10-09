@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Art Gallery</title>
+<style>body{margin:0;padding:16px;background:#2a1e14;color:#f2ead8;font:13px Georgia,serif}
+.row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}.st{position:relative;width:300px;height:400px;border:3px solid #111;overflow:hidden;background:#1a1815}
+.st .bd{position:absolute;inset:0}.st .bd svg{width:100%;height:100%}.st .sp{position:absolute;inset:0;display:flex;justify-content:center;align-items:flex-end}.st .sp svg{height:92%}
+.sc{width:640px;background:#111}.sc svg{width:100%;display:block}.tok{width:80px;height:110px;background:#c9b083}</style></head>
+<body><div class="row" id="chars"></div><div class="row" id="scenes"></div>
+<script src="../js/art.js"></script><script>
+const bio = { knight: 'road', goblin: 'road', warden: 'crypt', slime: 'bog', boar: 'forest', witch: 'hedge', treant: 'forest' };
+for (const n of Object.keys(CHARACTERS)) document.getElementById('chars').insertAdjacentHTML('beforeend', `<div class="st"><div class="bd">${BACKDROPS[bio[n]]}</div><div class="sp">${spriteSVG(n)}</div></div>`);
+const sc = document.getElementById('scenes');
+sc.insertAdjacentHTML('beforeend', `<div class="sc">${SCENES.rest()}</div><div class="sc">${SCENES.victory()}</div><div class="sc" style="width:300px">${SCENES.chestClosed()}</div><div class="sc" style="width:300px">${SCENES.chestOpen()}</div><div class="tok">${knightTokenSVG()}</div>`);
+</script></body></html>

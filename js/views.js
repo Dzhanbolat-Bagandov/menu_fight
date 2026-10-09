@@ -12,6 +12,8 @@ const Views = (() => {
     if (!RUN) return;
     const view = RUN.view, id = VIEW_IDS[view];
     for (const sec of document.querySelectorAll('#views > .view')) sec.hidden = sec.id !== id;
+    $('app').classList.toggle('view-battle', view === 'battle');
+    if (view !== 'battle') $('vignette').classList.remove('on');
     $('topbar').hidden = !TOPBAR_VIEWS.has(view);
     if (shown !== view) {
       const sec = $(id);
@@ -65,7 +67,7 @@ const Views = (() => {
   /* ---- map ------------------------------------------------------------------- */
   function nodePos(n) {
     const rows = RUN.map.rows, cols = MAP_LAYOUT.rows[n.row].length;
-    const y = 90 - n.row * (80 / (rows - 1));
+    const y = 93 - n.row * (86 / (rows - 1));
     const x = cols === 1 ? 50 : 20 + (n.col - 1) * (60 / (cols - 1));
     // small, stable wobble so the map looks hand-drawn
     const h = [...n.id].reduce((a, c) => a * 31 + c.charCodeAt(0), 7);
@@ -100,18 +102,18 @@ const Views = (() => {
       const can = next.includes(n.id);
       const b = el(can ? 'button' : 'div', `map-node has-tip type-${n.type}${can ? ' reachable' : ''}${visited ? ' visited' : ''}${n.id === RUN.at ? ' current' : ''}`);
       b.style.left = pos[n.id].x + '%'; b.style.top = pos[n.id].y + '%';
-      b.innerHTML = `${iconSVG(NODE_TYPES[n.type].icon)}<span class="node-label">${nodeLabel(n)}</span>`;
+      b.innerHTML = `${iconSVG(NODE_TYPES[n.type].icon, '', { bare: true })}<span class="node-label">${nodeLabel(n)}</span>`;
       b._tip = nodeTip(n);
       if (can) { b.type = 'button'; b.addEventListener('click', () => goTo(n.id, pos[n.id])); }
       field.appendChild(b);
     }
-    const tok = el('div', 'map-token', `<svg viewBox="-30 -56 60 84">${KNIGHT_HEAD(0, 0, 1)}</svg>`);
+    const tok = el('div', 'map-token', knightTokenSVG());
     tok.id = 'map-token';
     tok.style.left = pos[RUN.at].x + '%'; tok.style.top = pos[RUN.at].y + '%';
     field.appendChild(tok);
     board.appendChild(field);
     const legend = el('div', 'map-legend');
-    for (const t of ['fight', 'chest', 'rest', 'goal']) legend.appendChild(el('span', '', `${iconSVG(NODE_TYPES[t].icon)} ${NODE_TYPES[t].name}`));
+    for (const t of ['fight', 'chest', 'rest', 'goal']) legend.appendChild(el('span', '', `${iconSVG(NODE_TYPES[t].icon, '', { bare: true })} ${NODE_TYPES[t].name}`));
     board.appendChild(legend);
     board.appendChild(el('p', 'map-hint', next.length ? 'Choose where to go next. Glowing nodes are within reach.' : RUN.done ? 'Your journey is complete.' : ''));
     v.appendChild(board);
@@ -129,7 +131,7 @@ const Views = (() => {
   function gearCard(id) {
     const it = EQUIPMENT[id];
     const card = el('div', 'loot-card');
-    card.appendChild(iconTile({ icon: it.icon, tint: it.tint, size: 'lg', tip: equipTip(null, id) }));
+    card.appendChild(iconTile({ icon: it.icon, tint: it.tint, vt: it.tint, size: 'lg', tip: equipTip(null, id) }));
     const lines = Object.entries(it.bonus).map(([k, v]) => `+${v} ${BONUS_LABELS[k]}`).join(' · ') || 'No bonuses';
     card.appendChild(el('div', 'loot-text', `<b>${it.name}</b><span>${slotLabel(targetSlot(id))} · ${lines}</span><i>${it.desc}</i>`));
     const inPack = PLAYER.backpack.includes(id);
@@ -144,7 +146,7 @@ const Views = (() => {
     v.innerHTML = '';
     const card = el('div', 'scene-card');
     card.appendChild(el('h2', '', st.opened ? 'The chest creaks open' : 'An old chest'));
-    const stage = el('div', `chest-stage${st.opened ? ' open' : ''}`, st.opened ? SCENES.chestOpen : SCENES.chestClosed);
+    const stage = el('div', `chest-stage${st.opened ? ' open' : ''}`, st.opened ? SCENES.chestOpen() : SCENES.chestClosed());
     if (!st.opened) {
       stage.classList.add('clickable');
       stage.title = 'Open the chest';
@@ -176,14 +178,14 @@ const Views = (() => {
     v.innerHTML = '';
     const card = el('div', 'scene-card wide');
     card.appendChild(el('h2', '', 'Rest site'));
-    card.appendChild(el('div', 'rest-stage', SCENES.rest));
+    card.appendChild(el('div', 'rest-stage', SCENES.rest()));
     const opts = el('div', 'rest-options');
     for (const [key, o] of Object.entries(REST_OPTIONS)) {
       const chosen = st.choice === key;
       const b = el('button', `rest-option${chosen ? ' chosen' : ''}`);
       b.type = 'button';
       b.disabled = !!st.choice;
-      b.innerHTML = `<div class="tile tint-${o.tint}">${iconSVG(o.icon)}</div><div class="ro-text"><b>${o.name}</b><span>${o.preview()}</span></div>`;
+      b.innerHTML = `<div class="tile">${iconSVG(o.icon)}</div><div class="ro-text"><b>${o.name}</b><span>${o.preview()}</span></div>`;
       b.addEventListener('click', () => {
         Sfx.play(key === 'rest' ? 'restHeal' : 'scavenge');
         restChoose(key);
@@ -218,7 +220,7 @@ const Views = (() => {
     v.innerHTML = '';
     const card = el('div', `scene-card wide end-card ${won ? 'won' : 'lost'}`);
     card.appendChild(el('h1', '', won ? 'Victory!' : 'Run over'));
-    card.appendChild(el('div', 'end-stage', won ? SCENES.victory : `<div class="end-fallen">${SPRITES.knight}</div>`));
+    card.appendChild(el('div', 'end-stage', won ? SCENES.victory() : `<div class="end-fallen">${spriteSVG('knight')}</div>`));
     card.appendChild(el('p', 'scene-text', won ? 'The treasure is yours, and so is the princess\'s gratitude. The realm will sing of Sir Aldric.' : 'Sir Aldric has fallen. The road will wait for another hero.'));
     card.appendChild(el('ul', 'end-stats', `<li><span>Fights won</span><b>${s.fights}</b></li><li><span>Chests opened</span><b>${s.chests}</b></li><li><span>Rests taken</span><b>${s.rests}</b></li><li><span>Gear found</span><b>${s.found.length}</b></li><li><span>HP left</span><b>${PLAYER.hp} / ${PLAYER.maxHp}</b></li>`));
     const b = el('button', 'btn big primary', 'Start a new run');

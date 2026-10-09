@@ -74,7 +74,7 @@ const Fx = (() => {
   /* The shield appears in front of the defender (on the side facing the opponent). */
   const shieldX = (side) => (side === 'player' ? 64 : 36);
   function shieldFx(side, mode) {
-    const x = shieldX(side), svg = iconSVG('block');
+    const x = shieldX(side), svg = iconSVG('block', '', { bare: true });
     if (mode === 'up') {
       overlay(side, 'shield-fx', svg, [
         { transform: 'translate(-50%,-50%) scale(.4)', opacity: 0 },
@@ -103,14 +103,14 @@ const Fx = (() => {
     }
   }
   function iconPop(side, icon, cls = '') {
-    overlay(side, 'icon-pop ' + cls, iconSVG(icon), [
+    overlay(side, 'icon-pop ' + cls, iconSVG(icon, '', { bare: true }), [
       { transform: 'translate(-50%,-50%) scale(.3)', opacity: 0 },
       { transform: 'translate(-50%,-50%) scale(1.15)', opacity: 1, offset: 0.3 },
       { transform: 'translate(-50%,-70%) scale(1)', opacity: 0 },
     ], 700, rnd(42, 58));
   }
   function boltFx(side) {
-    overlay(side, 'bolt-fx', `<svg viewBox="0 0 48 48">${ICONS.bolt}</svg>`, [
+    overlay(side, 'bolt-fx', `<svg viewBox="0 0 64 64">${iconBody('bolt')}</svg>`, [
       { opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 0.2, offset: 0.25 }, { opacity: 1, offset: 0.4 }, { opacity: 0 },
     ], 380);
     sparks(side, ['#e8d4ff', '#9b6bd1', '#f4d35e'], 12, { spread: 70 });
@@ -118,11 +118,11 @@ const Fx = (() => {
 
   /* ---- projectile flying from one sprite to the other ---- */
   function projectile(from, icon, glow) {
-    const a = spriteEl(from).getBoundingClientRect(), b = spriteEl(other(from)).getBoundingClientRect();
+    const a = Scale.rectLocal(spriteEl(from).getBoundingClientRect()), b = Scale.rectLocal(spriteEl(other(from)).getBoundingClientRect());
     const x0 = a.left + a.width * 0.5, y0 = a.top + a.height * 0.45, x1 = b.left + b.width * 0.5, y1 = b.top + b.height * 0.45;
-    const p = el('div', 'projectile', iconSVG(icon));
+    const p = el('div', 'projectile', iconSVG(icon, '', { bare: true }));
     p.style.setProperty('--glow', glow);
-    document.body.appendChild(p);
+    $('root').appendChild(p);
     const flip = from === 'enemy' ? ' scaleX(-1)' : '';
     const r = anim(p, [
       { transform: `translate(${x0}px,${y0}px) translate(-50%,-50%) scale(.5)${flip}`, opacity: 0 },
@@ -209,5 +209,14 @@ const Fx = (() => {
     }
   }
 
-  return { handle, floatText };
+  let toastTimer = null;
+  function toast(text) {
+    const t = $('toast');
+    t.textContent = text;
+    t.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('on'), 1600);
+  }
+
+  return { handle, floatText, toast };
 })();

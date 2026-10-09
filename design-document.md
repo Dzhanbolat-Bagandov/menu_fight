@@ -26,14 +26,15 @@ menu_fight/
 │   ├── engine.js    # turn loop, damage pipeline, status handling, enemy AI
 │   ├── run.js       # the run: map, node outcomes, loot, save/load
 │   ├── views.js     # map, chest, rest site, victory/game-over screens, top bar
-│   ├── scenes.js    # SVG scene art (chest, rest site, victory)
+│   ├── art.js       # Storybook Ink characters, scenes, stage backdrops
+│   ├── settings.js  # settings, themes, generated textures, 1920x1080 canvas scaling
 │   ├── ui.js        # battle screen: render, tooltips, inventory modal, input
 │   ├── cli.js       # combat-log command line + debug commands
 │   ├── audio.js     # procedural sound effects (Web Audio API, no audio files)
 │   ├── fx.js        # visual effects + mapping engine events to sounds
-│   ├── sprites.js   # inline SVG placeholder sprites
-│   └── icons.js     # inline SVG square icons for moves, items, equipment, statuses
-└── assets/          # reserved for real art later
+│   └── icons.js     # Painted Classic icons (generated once into an SVG sprite sheet)
+├── assets/          # fonts (Cinzel, Alegreya; OFL) + fonts.css
+└── samples/         # style samples and dev galleries (icon-gallery.html, art-gallery.html)
 ```
 
 ## 3. Screen layout
@@ -83,14 +84,34 @@ Every move, item, equipment piece and status effect is represented by a **square
 
 ## 4. Visual style — cozy medieval
 
-- **Background:** dark wooden boards (CSS vertical plank gradients with subtle grain and board seams).
-- **Panels:** carved stone slabs or leather-bound frames set into the wood, with inner shadows.
-- **Trim and UI hardware:** sparse iron (buttons, rivets, frames) and bronze (accents, highlights, active states).
-- **Bars:** recessed troughs of dark iron. HP red, mana blue, stamina amber/green, block steel-grey. Subtle gloss and animated width transitions.
-- **Type:** serif or blackletter-adjacent system font stack with a warm off-white parchment text colour. Web fonts can be added later.
-- **Lighting:** warm, candle-like vignette over the whole screen.
-- All colours, spacing and textures are CSS custom properties (design tokens) in `:root` so the look is tweakable in one place.
-- Textures are generated in CSS or inline SVG; no external image dependency for v0.
+**Chosen styles** (from the samples in `samples/`):
+- **Characters and scenes: Storybook Ink.** Flat colour, a crisp cel-shadow band and a rim highlight on every shape, bold ink outlines. Every character is shape data in `art.js`, rendered by one function.
+- **Icons: Painted Classic** (WoW-like). Full-bleed square icons: a moody background in the icon's theme colour, the subject large and angled with painterly gradients, a glow behind it and a dark vignette, set in a gold bevelled frame. A "bare" version of each subject (no background) is used for badges, map nodes, projectiles and effects. Items that share an icon (rings, armour) get their background tinted by their colour.
+- **Fonts: Cinzel** (carved Trajan-style capitals) for titles, buttons, labels and numbers; **Alegreya** (calligraphic book face) for body text, tooltips and the log. Both are bundled in `assets/fonts`.
+
+**Layout.** The UI is designed on a fixed **1920×1080 canvas** that is scaled uniformly to fit the window, so it keeps its proportions at any resolution. Settings has an *Interface size* slider (70–100% of the window).
+
+**Backgrounds** (Settings → Background, switch instantly without reloading):
+
+| Theme | Page | Panels |
+|---|---|---|
+| Dark Oak (default) | dark planks | grey stone, iron frames |
+| Birch & Cobblestone | pale birch planks with bark marks | chunky pixel cobblestone (Minecraft-like, generated in code) |
+| Castle Hall | slate ashlar wall, red tapestries, torch glow | dark walnut, brass trim |
+| Night Camp | starry night sky with campfire glow | dark leather |
+
+Text-heavy cards (settings, inventory, tooltips, scenes) use a calmer surface where the panel texture is busy.
+
+**Stage backdrops.** Each enemy has a biome drawn behind both characters: road (Grubnik), bog (Gloop), forest (Boar, Ironbark), hedgerow (Mother Nettle), crypt (Warden).
+
+**Ambient touches.** Characters breathe with a slow idle animation, a red vignette pulses at the screen edges when your HP is at 30% or below, and *Reduce motion* turns idle and looping animations off.
+
+**Combat log modes** (Settings, the log button at top right, or hotkey **L**):
+- **Docked:** a framed panel along the bottom.
+- **Blend-in:** frameless text floating over the scene (over your character's stage in fights). Lines fade after 7 seconds; hover the log to read back and type commands.
+- **Hidden:** the log disappears and the stages get the full height. Press **/** to open the command line.
+
+**Settings** (gear button at top right, hotkey **O**): background, log mode, interface size, sound on/off and volume, reduce motion. Settings are remembered in the browser.
 
 ## 4.1 Animation, effects and sound
 
@@ -134,10 +155,10 @@ Sound can be toggled with the button on the combat log or with the `sound` CLI c
 
 ## 5. Sprites
 
-Simple hand-drawn **inline SVG placeholders**, one function per character in `sprites.js`. Replacing one with real art later means swapping it for an `<img>`.
+Storybook Ink SVG characters in `art.js` (see section 4). Replacing one with real art later means swapping it for an `<img>`.
 
-- **Player:** a generic knight in plate armour with a helmet with an open visor (face visible), sword and kite shield, standing in a three-quarter pose facing right.
-- **Enemies:** see section 9.
+- **Player:** a knight in plate armour with an open-visored helm and red plume, a red tabard with a gold cross, a cape, a blue kite shield with a silver chevron, and the sword raised diagonally.
+- **Enemies:** see section 10.
 
 ## 6. Core rules
 
@@ -363,6 +384,7 @@ Initial command set (extensible; each command is a small entry in a table in `cl
 | `intent <moveId>` | Force the enemy's next move. |
 | `god` | Toggle invulnerable player. |
 | `sound [on\|off\|0-100\|name]` | Toggle sound, set volume, or play a sound. |
+| `theme <oak\|birch\|castle\|night>` / `logmode <docked\|blend\|hidden>` | Change the background or the log mode. |
 | `clear` | Clear the log. |
 | `state` | Dump the current state as JSON. |
 

@@ -74,6 +74,8 @@ const COMMANDS = {
       Sfx.play(arg);
     },
   },
+  theme: { usage: 'theme <oak|birch|castle|night>', desc: 'Switch the background theme.', run([t]) { if (!THEMES[t]) throw new Error(`Unknown theme "${t}" (${Object.keys(THEMES).join(', ')})`); Settings.set('theme', t); log(`Theme: ${THEMES[t].name}.`, 'sys'); } },
+  logmode: { usage: 'logmode <docked|blend|hidden>', desc: 'Set the combat log mode.', run([m]) { if (!LOG_MODES[m]) throw new Error(`Unknown mode "${m}"`); Settings.set('log', m); } },
   clear: { usage: 'clear', desc: 'Clear the log.', run() { LOG = []; $('log').innerHTML = ''; } },
   state: { usage: 'state', desc: 'Dump the battle (or run) state as JSON.', run() { const s = JSON.stringify(G || { ...RUN, map: undefined }, (k, v) => (k === 'def' ? v.id : v), 1); s.split('\n').forEach((l) => log(l, 'sys mono')); } },
 };
